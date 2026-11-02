@@ -1,13 +1,32 @@
 import random
+from collections.abc import Callable
 
 from tablut.common.enums.algorithm import GAME_STATUS
 from tablut.common.enums.chess import CHESS
 from tablut.common.enums.player import ROLE
 from tablut.common.types.algorithm import Best_Movement, Node
 
+type Board = list[list[CHESS]]
+type HeuristicFn = Callable[[Board, ROLE], int]
+type GameStatusFn = Callable[[Board, ROLE], GAME_STATUS]
+type IsValidMovementFn = Callable[[Board, Node, Node], bool]
+
 
 class CookedTree:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        heuristic: HeuristicFn | None = None,
+        game_status: GameStatusFn | None = None,
+        is_valid_movement: IsValidMovementFn | None = None,
+    ) -> None:
+        # The rules can be injected so the search can be tested in isolation;
+        # by default the class' own implementations are used.
+        self._heuristic: HeuristicFn = heuristic or self.__get_heuristic
+        self._game_status: GameStatusFn = game_status or self.__get_game_status
+        self._is_valid_movement: IsValidMovementFn = (
+            is_valid_movement or self.__is_valid_movement
+        )
+
         self.INF: int = 0x3F3F3F
         self.throne: Node = Node(4, 4)
         self.move_row: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, -1, -2, -3, -4, -5, -6, -7, -8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # fmt: skip # noqa: E501
@@ -85,7 +104,7 @@ class CookedTree:
             for mv_row, mv_col in zip(self.move_row, self.move_col, strict=True):
                 next_node: Node = Node(node.row + mv_row, node.col + mv_col)
 
-                if not self.__is_valid_movement(chess_board, node, next_node):
+                if not self._is_valid_movement(chess_board, node, next_node):
                     continue
 
                 # Default to the first legal move so a forced loss still plays one.
@@ -136,7 +155,7 @@ class CookedTree:
         beta: int,
     ) -> int:
 
-        game_status: GAME_STATUS = self.__get_game_status(chess_board, role)
+        game_status: GAME_STATUS = self._game_status(chess_board, role)
         if game_status == GAME_STATUS.WHITE_WIN:
             return self.INF
         if game_status == GAME_STATUS.BLACK_WIN:
@@ -144,7 +163,7 @@ class CookedTree:
         if game_status == GAME_STATUS.DRAW:
             return 0
         if cur_depth >= max_depth:
-            return self.__get_heuristic(chess_board, role)
+            return self._heuristic(chess_board, role)
 
         alive_chess: list[Node] = self.__get_alive_chess(chess_board, role)
 
@@ -153,7 +172,7 @@ class CookedTree:
         for from_node in alive_chess:
             for mv_row, mv_col in zip(self.move_row, self.move_col, strict=True):
                 next_node: Node = Node(from_node.row + mv_row, from_node.col + mv_col)
-                if not self.__is_valid_movement(chess_board, from_node, next_node):
+                if not self._is_valid_movement(chess_board, from_node, next_node):
                     continue
 
                 moving_piece, old_target = self.__make_move(
