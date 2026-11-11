@@ -22,6 +22,8 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.17.3",
 ]
 
@@ -43,3 +45,19 @@ select = [
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "blackbox: tests that only use the public API (get_next_movement)",
+    "whitebox: tests that target internal structure, branches and helpers",
+]
+
+[tool.coverage.run]
+branch = true
+
+[tool.mypy]
+# Mirrors pytest's `pythonpath = ["tests"]` so `import tree_helpers` resolves.
+mypy_path = "$MYPY_CONFIG_FILE_DIR/tests"
