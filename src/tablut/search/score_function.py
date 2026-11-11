@@ -1,75 +1,74 @@
 # Candidate Score Function:
+from tablut.common.enums.chess import CHESS
+from tablut.common.enums.player import ROLE
+from tablut.common.types.algorithm import Node
+
+type Board = list[list[CHESS]]
+
+INF: int = 0x3F3F3F
+
+# We could penalise the loss of pieces but giving score a -10 to begin with for each piece lost.
 
 
-def dist(CHESS1, CHESS2):
-    row_dist = abs(CHESS1.row - CHESS2.row)
-    col_dist = abs(CHESS1.column - CHESS2.column)
-    dist = row_dist + col_dist
-    return dist
+def dist(x, y, Node):
+    x_dist = abs(x - Node.row)
+    y_dist = abs(y - Node.col)
+    distance = x_dist + y_dist
+    return distance
 
 
-def score(CHESS, chess_board, role):
+def is_valid_movement(chess_board: list[list[CHESS]], from_node: Node, to_node: Node):
+    pass
+
+
+def get_score(current_node: Node, chess_board: Board, role: ROLE):
     score = 0
     neighbor = None
-    if role == "white":
-        if CHESS.king:
-            for win in chess_board.Wins:
-                if win.row == CHESS.row & win.column == CHESS.column:
-                    return 100000  # random large number
-                if win.row == CHESS.row or win.column == CHESS.column:
-                    check = False
-                    for piece in chess_board.Pieces:
-                        if piece.row == CHESS.row or piece.column == CHESS.column:
-                            check = True
-                            break
-                    if check == False & score >= 0:
-                        score += 2
-                        break
-        for piece in chess_board.Pieces:
-            if dist(CHESS, piece) == 1 and piece.role == "black":
-                score -= 1
-                neighbor = piece
-            if score == -2:
-                break
-        # pretty random value, the best approach is probably to test experimentally.
-        # For captures:
-        if score == -1:
-            for piece in chess_board.Pieces:
-                if (
-                    dist(neighbor, piece) == 1
-                    and piece.role == "white"
-                    and (piece.row == CHESS.row or piece.column == CHESS.column)
-                ):
-                    score += 3
-            # again, the values should be calibrated based on experiments
 
-    # for black:
+    if role == ROLE.WHITE:
+        if chess_board(current_node.row, current_node.column) == CHESS.KING and (
+            is_valid_movement(chess_board, current_node, Node(current_node.row, 9))
+            or is_valid_movement(chess_board, current_node, Node(current_node.row, -9))
+            or is_valid_movement(chess_board, current_node, Node(9, current_node.col))
+            or is_valid_movement(chess_board, current_node, Node(-9, current_node.col))
+        ):
+            score += 5  # random value
+
+        for x in range(1, 10):
+            for y in range(1, 10):
+                piece = chess_board[x][y]
+                if piece == CHESS.BLACK and dist(x, y, current_node) == 1:
+                    score -= 1
+                    neighbor = Node(x, y)
+                if score == -2:
+                    break
+        if score == -1:
+            for x in range(1, 10):
+                for y in range(1, 10):
+                    if (
+                        dist(x, y, neighbor) == 1
+                        and piece.role == "white"
+                        and (x == current_node.row or y == current_node.column)
+                        and (Node(x, y) != current_node)
+                    ):
+                        score += 3
+
     else:
-        for piece in chess_board.Pieces:
-            if dist(CHESS, piece) == 1 and piece.role == "white":
-                score += 1
-                neighbor = piece
-            if score == +2:
-                break
-            for piece in chess_board.Pieces:
-                if piece.row == CHESS.row or piece.column == CHESS.column:
-                    check = True
+        for x in range(1, 10):
+            for y in range(1, 10):
+                piece = chess_board[x][y]
+                if piece == CHESS.WHITE and dist(x, y, Node) == 1:
+                    score += 1
+                if score == 2:
                     break
-                if check == False & score >= 0:
-                    score -= 2
-                    break
-        # pretty random value, the best approach is probably to test experimentally.
-        # For captures:
-        if score == +1:
-            for piece in chess_board.Pieces:
-                if (
-                    dist(neighbor, piece) == 1
-                    and piece.role == "black"
-                    and (piece.row == CHESS.row or piece.column == CHESS.column)
-                ):
-                    if neighbor.king:
-                        score -= 6
-                    else:
+        if score == 1:
+            for x in range(1, 10):
+                for y in range(1, 10):
+                    if (
+                        dist(x, y, neighbor) == 1
+                        and piece.role == "white"
+                        and (x == current_node.row or y == current_node.column)
+                        and (Node(x, y) != current_node)
+                    ):
                         score -= 3
-            # again, the values should be calibrated based on experiments
     return score
