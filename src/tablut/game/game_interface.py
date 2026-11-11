@@ -89,7 +89,7 @@ class ChessGameInterface:
         self, timer: Timer
     ) -> tuple[tuple[int, int], tuple[int, int]]:
         try:
-            # TODO: Implement here with time constraint and proper depth
+            # TODO: Implement here with time constraint and proper depth: self.__max_depth
             movement = self.__cooked_tree.get_next_movement(
                 self.__chess_board, self.__role, 10
             )
