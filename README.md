@@ -75,6 +75,22 @@ uv run python src/test/_test_chess_game_black.py
 
 **Important:** Always connect WHITE first, then BLACK. The referee waits for both players to connect before starting the game.
 
+### Automated tests
+
+Unit tests for the search live in `tests/` (black-box and white-box, see [docs/test_cases/test_strategy.md](docs/test_cases/test_strategy.md)):
+
+```bash
+uv run pytest                  # all tests
+uv run pytest -m blackbox      # public-API tests only
+uv run pytest -m whitebox      # internal-structure tests only
+```
+
+A `pre-commit` hook runs them (with a 100% line + branch coverage gate on `cooked_tree`) before every commit and aborts the commit on failure. Enable it once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
 ## Commit Convention
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
