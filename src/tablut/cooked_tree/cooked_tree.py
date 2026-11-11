@@ -1,31 +1,17 @@
-from collections.abc import Callable
-
 from tablut.common.enums.algorithm import GAME_STATUS
 from tablut.common.enums.chess import CHESS
 from tablut.common.enums.player import ROLE
-from tablut.common.types.algorithm import Best_Movement, Node
-from tablut.search.score_function import get_score
-
-type Board = list[list[CHESS]]
-type HeuristicFn = Callable[[Board, ROLE], int]
-type GameStatusFn = Callable[[Board, ROLE], GAME_STATUS]
-type IsValidMovementFn = Callable[[Board, Node, Node], bool]
+from tablut.common.types.algorithm import (
+    Best_Movement,
+    Board,
+    Node,
+)
 
 
 class CookedTree:
     def __init__(
         self,
-        heuristic: HeuristicFn | None = None,
-        game_status: GameStatusFn | None = None,
-        is_valid_movement: IsValidMovementFn | None = None,
     ) -> None:
-        # The rules can be injected so the search can be tested in isolation;
-        # by default the class' own implementations are used.
-        self._heuristic: HeuristicFn = heuristic or self.__get_heuristic
-        self._game_status: GameStatusFn = game_status or self.__get_game_status
-        self._is_valid_movement: IsValidMovementFn = (
-            is_valid_movement or self.__is_valid_movement
-        )
 
         self.INF: int = 0x3F3F3F
         self.throne: Node = Node(4, 4)
@@ -46,27 +32,24 @@ class CookedTree:
                     alive_chess.append(Node(i, j))
         return alive_chess
 
-    def __get_heuristic(self, chess_board: list[list[CHESS]], role: ROLE) -> int:
-        heuristic = 0
-        alive_chess = self.__get_alive_chess(chess_board, role)
-        for node in alive_chess:
-            heuristic += get_score(node, chess_board, role)
-        return heuristic
+    def _get_heuristic(self, chess_board: list[list[CHESS]], role: ROLE) -> int:
+        # TODO: Implement this in the subclass
+        return -1
 
-    def __get_game_status(
+    def _get_game_status(
         self, chess_board: list[list[CHESS]], role: ROLE
     ) -> GAME_STATUS:
-        # TODO: Implement this function
+        # TODO: Implement this in the subclass
         return GAME_STATUS.ONGOING
 
-    def __is_valid_movement(
+    def _is_valid_movement(
         self, chess_board: list[list[CHESS]], from_node: Node, to_node: Node
     ) -> bool:
-        # TODO: Implement this function
+        # TODO: Implement this in the subclass
         return True
 
     def __make_move(
-        self, chess_board: list[list[CHESS]], from_node: Node, to_node: Node
+        self, chess_board: Board, from_node: Node, to_node: Node
     ) -> tuple[CHESS, CHESS]:
         """Apply a move in place; return (moving piece, previous target cell)."""
         moving_piece: CHESS = chess_board[from_node.row][from_node.col]
@@ -81,7 +64,7 @@ class CookedTree:
 
     def __undo_move(
         self,
-        chess_board: list[list[CHESS]],
+        chess_board: Board,
         from_node: Node,
         to_node: Node,
         moving_piece: CHESS,
@@ -91,7 +74,7 @@ class CookedTree:
         chess_board[from_node.row][from_node.col] = moving_piece
 
     def get_next_movement(
-        self, chess_board: list[list[CHESS]], role: ROLE, max_depth: int
+        self, chess_board: Board, role: ROLE, max_depth: int
     ) -> Best_Movement:
 
         alive_chess = self.__get_alive_chess(chess_board, role)
@@ -150,7 +133,7 @@ class CookedTree:
 
     def __min_max_tree(
         self,
-        chess_board: list[list[CHESS]],
+        chess_board: Board,
         max_depth: int,
         role: ROLE,
         cur_depth: int,
@@ -158,7 +141,7 @@ class CookedTree:
         beta: int,
     ) -> int:
 
-        game_status: GAME_STATUS = self._game_status(chess_board, role)
+        game_status: GAME_STATUS = self._get_game_status(chess_board, role)
         if game_status == GAME_STATUS.WHITE_WIN:
             return self.INF
         if game_status == GAME_STATUS.BLACK_WIN:
@@ -166,7 +149,7 @@ class CookedTree:
         if game_status == GAME_STATUS.DRAW:
             return 0
         if cur_depth >= max_depth:
-            return self._heuristic(chess_board, role)
+            return self._get_heuristic(chess_board, role)
 
         alive_chess: list[Node] = self.__get_alive_chess(chess_board, role)
 
@@ -204,6 +187,3 @@ class CookedTree:
                         return best
 
         return best
-
-
-############

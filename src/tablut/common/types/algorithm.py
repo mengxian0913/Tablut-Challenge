@@ -1,4 +1,17 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+
 from pydantic import BaseModel as Model
+
+from tablut.common.enums.algorithm import GAME_STATUS
+from tablut.common.enums.chess import CHESS
+from tablut.common.enums.player import ROLE
+
+type Board = list[list[CHESS]]
+type HeuristicFn = Callable[[Board, ROLE], int]
+type GameStatusFn = Callable[[Board, ROLE], GAME_STATUS]
+type IsValidMovementFn = Callable[[Board, Node, Node], bool]
 
 
 class Node(Model):
