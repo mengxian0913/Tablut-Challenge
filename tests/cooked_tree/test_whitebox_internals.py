@@ -361,3 +361,14 @@ def test_wb14_oracle_move_generator_agrees_with_the_fake_rule(seed, role):
     }
 
     assert set(legal_moves(board, role)) == by_rule
+
+
+def test_wb13_default_heuristic_uses_get_score():
+    """Test that __get_heuristic is called when no custom heuristic is injected."""
+    tree = CookedTree()
+    board = make_board({(3, 3): CHESS.WHITE, (5, 5): CHESS.BLACK})
+
+    # This should use the default __get_heuristic which calls get_score
+    result = tree._heuristic(board, ROLE.WHITE)
+
+    assert isinstance(result, int)

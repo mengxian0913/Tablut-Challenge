@@ -10,6 +10,12 @@ INF: int = 0x3F3F3F
 # We could penalise the loss of pieces but giving score a -10 to begin with for each piece lost.
 
 
+"""
+1. Define the rule of getting point for each role of their pieces on the board.
+2. Define the score for each situation of based on the rule.
+"""
+
+
 def dist(x, y, Node):
     x_dist = abs(x - Node.row)
     y_dist = abs(y - Node.col)
@@ -26,7 +32,7 @@ def get_score(current_node: Node, chess_board: Board, role: ROLE):
     neighbor = None
 
     if role == ROLE.WHITE:
-        if chess_board(current_node.row, current_node.column) == CHESS.KING and (
+        if chess_board[current_node.row][current_node.col] == CHESS.KING and (
             is_valid_movement(chess_board, current_node, Node(current_node.row, 9))
             or is_valid_movement(chess_board, current_node, Node(current_node.row, -9))
             or is_valid_movement(chess_board, current_node, Node(9, current_node.col))
@@ -34,8 +40,8 @@ def get_score(current_node: Node, chess_board: Board, role: ROLE):
         ):
             score += 5  # random value
 
-        for x in range(1, 10):
-            for y in range(1, 10):
+        for x in range(9):
+            for y in range(9):
                 piece = chess_board[x][y]
                 if piece == CHESS.BLACK and dist(x, y, current_node) == 1:
                     score -= 1
@@ -43,31 +49,31 @@ def get_score(current_node: Node, chess_board: Board, role: ROLE):
                 if score == -2:
                     break
         if score == -1:
-            for x in range(1, 10):
-                for y in range(1, 10):
+            for x in range(9):
+                for y in range(9):
                     if (
                         dist(x, y, neighbor) == 1
-                        and piece.role == "white"
-                        and (x == current_node.row or y == current_node.column)
+                        and chess_board[x][y] == CHESS.WHITE
+                        and (x == current_node.row or y == current_node.col)
                         and (Node(x, y) != current_node)
                     ):
                         score += 3
 
     else:
-        for x in range(1, 10):
-            for y in range(1, 10):
+        for x in range(9):
+            for y in range(9):
                 piece = chess_board[x][y]
-                if piece == CHESS.WHITE and dist(x, y, Node) == 1:
+                if piece == CHESS.WHITE and dist(x, y, current_node) == 1:
                     score += 1
                 if score == 2:
                     break
         if score == 1:
-            for x in range(1, 10):
-                for y in range(1, 10):
+            for x in range(9):
+                for y in range(9):
                     if (
                         dist(x, y, neighbor) == 1
-                        and piece.role == "white"
-                        and (x == current_node.row or y == current_node.column)
+                        and chess_board[x][y] == CHESS.WHITE
+                        and (x == current_node.row or y == current_node.col)
                         and (Node(x, y) != current_node)
                     ):
                         score -= 3
