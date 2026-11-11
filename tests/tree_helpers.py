@@ -117,17 +117,6 @@ def ongoing(board: Board, role: ROLE) -> GAME_STATUS:
     return GAME_STATUS.ONGOING
 
 
-def make_tree(
-    heuristic: Callable[[Board, ROLE], int] | None = None,
-    game_status: Callable[[Board, ROLE], GAME_STATUS] = ongoing,
-) -> CookedTree:
-    return CookedTree(
-        heuristic=heuristic or seeded_heuristic(),
-        game_status=game_status,
-        is_valid_movement=rook_is_valid,
-    )
-
-
 # ---------------------------------------------------------------- oracle
 
 
