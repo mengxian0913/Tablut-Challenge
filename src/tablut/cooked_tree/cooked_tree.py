@@ -1,10 +1,10 @@
-import random
 from collections.abc import Callable
 
 from tablut.common.enums.algorithm import GAME_STATUS
 from tablut.common.enums.chess import CHESS
 from tablut.common.enums.player import ROLE
 from tablut.common.types.algorithm import Best_Movement, Node
+from tablut.search.score_function import get_score
 
 type Board = list[list[CHESS]]
 type HeuristicFn = Callable[[Board, ROLE], int]
@@ -47,8 +47,13 @@ class CookedTree:
         return alive_chess
 
     def __get_heuristic(self, chess_board: list[list[CHESS]], role: ROLE) -> int:
-        # TODO: Implement heuristic function
-        return random.randint(-100, 100)
+        scores = []
+        alive_chess = self.__get_alive_chess(chess_board, role)
+        for node in alive_chess:
+            scores.append(get_score(node, chess_board, role))
+        heuristic = max(scores)
+        # I'm using max now, but we could think of other ways to improve this. I don't think this is optimal.
+        return heuristic
 
     def __get_game_status(
         self, chess_board: list[list[CHESS]], role: ROLE
@@ -201,3 +206,6 @@ class CookedTree:
                         return best
 
         return best
+
+
+############
