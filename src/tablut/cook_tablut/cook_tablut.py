@@ -4,7 +4,7 @@ from tablut.common.types.algorithm import Board, Node
 from tablut.cooked_tree.cooked_tree import CookedTree
 
 
-class CookTablut(CookedTree):
+class CookedTablut(CookedTree):
     def _get_heuristic(self, chess_board: Board, role: ROLE) -> int:
         # TODO: Implement this in the subclass
         return -1
