@@ -37,7 +37,7 @@ class CookedTree:
         return -1
 
     def _get_game_status(
-        self, chess_board: list[list[CHESS]], role: Role
+        self, chess_board: list[list[CHESS]], role: ROLE
     ) -> GAME_STATUS:
         # TODO: Implement this in the subclass
         return GAME_STATUS.ONGOING
