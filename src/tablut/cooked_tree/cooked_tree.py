@@ -1,3 +1,6 @@
+import time
+from collections.abc import Callable
+
 from tablut.common.enums.algorithm import GAME_STATUS
 from tablut.common.enums.chess import CHESS
 from tablut.common.enums.player import ROLE
@@ -6,6 +9,10 @@ from tablut.common.types.algorithm import (
     Board,
     Node,
 )
+
+
+class SearchTimeout(Exception):
+    """Raised inside the search when the deadline has passed."""
 
 
 class CookedTree:
@@ -17,6 +24,11 @@ class CookedTree:
         self.throne: Node = Node(4, 4)
         self.move_row: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, -1, -2, -3, -4, -5, -6, -7, -8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # fmt: skip # noqa: E501
         self.move_col: list[int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, -1, -2, -3, -4, -5, -6, -7, -8]  # fmt: skip # noqa: E501
+
+        # Depth fully searched by the last get_next_movement_in_time call.
+        self.completed_depth: int = 0
+        self._clock: Callable[[], float] = time.perf_counter
+        self.__deadline: float | None = None
 
     def _get_alive_chess(
         self, chess_board: list[list[CHESS]], role: ROLE
@@ -154,6 +166,43 @@ class CookedTree:
 
         return best_movement
 
+    def get_next_movement_in_time(
+        self, chess_board: Board, role: ROLE, time_limit: float, max_depth: int = 32
+    ) -> Best_Movement:
+        """Iterative deepening: search depth 1, 2, ... for at most ``time_limit``
+        seconds and return the move of the last depth that was fully searched."""
+        deadline = self._clock() + time_limit
+        snapshot = [row[:] for row in chess_board]
+
+        # Depth 1 runs without a deadline, so there is always a move to play.
+        best = self.get_next_movement(chess_board, role, 1)
+        self.completed_depth = 1
+
+        for depth in range(2, max_depth + 1):
+            # A forced win or loss (or no legal move) cannot be refined further.
+            if abs(best.score) >= self.INF:
+                break
+
+            started = self._clock()
+            self.__deadline = deadline
+            try:
+                best = self.get_next_movement(chess_board, role, depth)
+            except SearchTimeout:
+                # The search stopped half-way: put the moved pieces back.
+                for row, saved in zip(chess_board, snapshot, strict=True):
+                    row[:] = saved
+                break
+            finally:
+                self.__deadline = None
+            self.completed_depth = depth
+
+            # The next depth is slower than this one: skip it if it cannot fit.
+            now = self._clock()
+            if now - started >= deadline - now:
+                break
+
+        return best
+
     def __min_max_tree(
         self,
         chess_board: Board,
@@ -163,6 +212,9 @@ class CookedTree:
         alpha: int,
         beta: int,
     ) -> int:
+
+        if self.__deadline is not None and self._clock() >= self.__deadline:
+            raise SearchTimeout
 
         game_status: GAME_STATUS = self._get_game_status(chess_board, role)
         if game_status == GAME_STATUS.WHITE_WIN:

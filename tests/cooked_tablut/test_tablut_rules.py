@@ -182,6 +182,67 @@ def test_blacks_around_the_king_do_not_end_the_game_by_themselves(blacks):
     assert CookedTablut()._get_game_status(board, ROLE.WHITE) == GAME_STATUS.ONGOING
 
 
+@pytest.mark.parametrize(
+    ("pieces", "blocked", "expected"),
+    [
+        ({(0, 0): K, (0, 1): B, (1, 0): B}, ROLE.WHITE, GAME_STATUS.BLACK_WIN),
+        (
+            {(0, 0): B, (0, 1): W, (1, 0): W, (4, 4): K},
+            ROLE.BLACK,
+            GAME_STATUS.WHITE_WIN,
+        ),
+    ],
+)
+def test_a_side_that_cannot_move_any_piece_loses(pieces, blocked, expected):
+    tree = CookedTablut()
+    other = ROLE.BLACK if blocked == ROLE.WHITE else ROLE.WHITE
+
+    assert tree._get_game_status(make_board(pieces), blocked) == expected
+    assert tree._get_game_status(make_board(pieces), other) == GAME_STATUS.ONGOING
+
+
+# -------------------------------------------------------------- heuristic
+
+
+@pytest.mark.parametrize("role", [ROLE.WHITE, ROLE.BLACK])
+def test_heuristic_is_white_perspective_whoever_is_to_move(role):
+    """White piece under threat (-1) minus black piece with a target (+1)."""
+    board = make_board({(4, 4): K, (2, 2): W, (2, 3): B})
+
+    assert CookedTablut()._get_heuristic(board, role) == -2
+
+
+def test_king_escape_bonus_does_not_hide_the_support_check():
+    """3 open escape lines (+15), 1 attacker (-1) that stands between the king
+    and a white piece (+3)."""
+    board = make_board({(2, 2): K, (3, 2): B, (4, 2): W})
+
+    assert CookedTablut().get_score(Node(2, 2), board, ROLE.WHITE) == 17
+
+
+@pytest.mark.parametrize(
+    ("whites", "expected"),
+    [
+        ([(2, 3)], 1),  # a target
+        ([(2, 3), (2, 4)], -2),  # the target is covered: no sandwich
+    ],
+)
+def test_black_piece_next_to_a_single_white(whites, expected):
+    board = make_board({(2, 2): B} | dict.fromkeys(whites, W))
+
+    assert CookedTablut().get_score(Node(2, 2), board, ROLE.BLACK) == expected
+
+
+@pytest.mark.parametrize(
+    ("piece", "enemy", "role", "expected"),
+    [(W, B, ROLE.WHITE, -2), (B, W, ROLE.BLACK, 2)],
+)
+def test_at_most_two_adjacent_enemies_count(piece, enemy, role, expected):
+    board = make_board({(6, 6): piece, (5, 6): enemy, (7, 6): enemy, (6, 5): enemy})
+
+    assert CookedTablut().get_score(Node(6, 6), board, role) == expected
+
+
 # ----------------------------------------------------------------- search
 
 

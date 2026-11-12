@@ -94,6 +94,11 @@ Designed from the internal structure; the target is **every branch** and **every
 | WB-13 | White-box / characterization | Depth 0 behaves like depth 1 |
 | WB-14 | White-box | The oracle's move generator agrees with the fake rule (the checker itself is checked) |
 | WB-15 | White-box | Same score, move and number of evaluated leaves as an independent textbook alpha-beta |
+| WB-16 | White-box | Iterative deepening with enough time equals the fixed-depth search of the last depth |
+| WB-17 | White-box / fake clock | Deadline in the middle of a depth: the last completed depth is returned, the board is restored, the deadline is cleared |
+| WB-18 | White-box / boundary | Depth 1 always completes, even with no time at all |
+| WB-19 | White-box | A decided position (forced win/loss) is not searched deeper |
+| WB-20 | White-box / fake clock | The next depth is not started when the previous one took longer than the time left |
 
 ## 5. Coverage and mutation testing
 
@@ -124,7 +129,7 @@ uv run pytest -m whitebox          # white-box only
 uv run pytest --cov=tablut.cooked_tree --cov-branch --cov-report=term-missing   # coverage report
 ```
 
-The whole suite takes about 10 seconds (180 tests).
+The whole suite takes about 15 seconds (200 tests).
 
 ## 7. Git commit workflow
 
@@ -145,8 +150,9 @@ tests, not the linter (the project still has pre-existing `E501` errors in `game
 2. What to expect when adding optimisations:
    - **Move ordering**: scores must not change (BB-01 must still pass); WB-12 and WB-15 will fail, which is
      expected: check the change is intended, then update them.
-   - **Iterative deepening / time limit**: the fixed-depth behaviour must stay the same; add new tests for
-     "on timeout the move of the last completed depth is returned".
+   - **Iterative deepening / time limit** (`get_next_movement_in_time`, WB-16..20): it calls the
+     fixed-depth `get_next_movement` once per depth, so the fixed-depth behaviour must stay the same. The
+     tests replace `_clock` with a hand-driven clock; never test it with real sleeps.
    - **Transposition table**: the BB-01 differential test must still pass (it is the most important safety
      net); also add a test that a cache hit gives the same result as a miss.
    - **C++ port**: compare the Python and C++ scores on the same random boards.
@@ -159,7 +165,8 @@ tests, not the linter (the project still has pre-existing `E501` errors in `game
 
 ## 9. Known gaps
 
-- Repeated positions (draw) are not implemented, and the heuristic has no tests.
+- Repeated positions (draw) are not implemented. The heuristic only has a few tests for its scoring
+  rules (perspective, support and cover checks); its playing strength is not verified.
 - The rule tests are hand-written cases derived from the referee's source; there is no automated
   differential test against the Java engine.
 - Mutation testing is run by hand and is not part of CI; repeat it after any large change to the search.

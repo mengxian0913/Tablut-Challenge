@@ -19,102 +19,81 @@ CAMP_EDGE_CENTERS = frozenset({(0, 4), (8, 4), (4, 0), (4, 8)})
 
 
 class CookedTablut(CookedTree):
-    def dist(self, x, y, Node):
-        x_dist = abs(x - Node.row)
-        y_dist = abs(y - Node.col)
-        distance = x_dist + y_dist
-        return distance
-
     def _get_heuristic(self, chess_board: Board, role: ROLE) -> int:
-        scores = []
-        alive = super()._get_alive_chess(chess_board, role)
-        for piece in alive:
-            scores.append(self.get_score(piece, chess_board, role))
-        heuristic = sum(scores)
-        return heuristic
+        """White-perspective evaluation: the higher, the better for White.
 
-    def get_score(self, current_node: Node, chess_board: Board, role: ROLE):
+        Both sides are always scored, so the value does not depend on which
+        side is to move at the leaf.
+        """
+        white = sum(
+            self.get_score(piece, chess_board, ROLE.WHITE)
+            for piece in super()._get_alive_chess(chess_board, ROLE.WHITE)
+        )
+        black = sum(
+            self.get_score(piece, chess_board, ROLE.BLACK)
+            for piece in super()._get_alive_chess(chess_board, ROLE.BLACK)
+        )
+        return white - black
+
+    def get_score(self, current_node: Node, chess_board: Board, role: ROLE) -> int:
+        """Score of one piece for its own side: the higher, the better for ``role``."""
+        row, col = current_node.row, current_node.col
         score = 0
-        neighbor = None
 
-        if role == ROLE.WHITE:
-            if chess_board[current_node.row][current_node.col] == CHESS.KING:
-                winning = [
-                    Node(0, 1),
-                    Node(0, 2),
-                    Node(0, 6),
-                    Node(0, 7),
-                    Node(1, 0),
-                    Node(2, 0),
-                    Node(1, 8),
-                    Node(2, 8),
-                    Node(6, 0),
-                    Node(7, 0),
-                    Node(8, 1),
-                    Node(8, 2),
-                    Node(6, 8),
-                    Node(7, 8),
-                    Node(8, 6),
-                    Node(8, 7),
-                ]
-                for winning_node in winning:
-                    if (
-                        current_node.row == winning_node.row
-                        or current_node.col == winning_node.col
-                    ) and self._is_valid_movement(
-                        chess_board, current_node, winning_node
-                    ):
-                        score += 5
+        if role == ROLE.WHITE and chess_board[row][col] == CHESS.KING:
+            winning = [
+                Node(0, 1),
+                Node(0, 2),
+                Node(0, 6),
+                Node(0, 7),
+                Node(1, 0),
+                Node(2, 0),
+                Node(1, 8),
+                Node(2, 8),
+                Node(6, 0),
+                Node(7, 0),
+                Node(8, 1),
+                Node(8, 2),
+                Node(6, 8),
+                Node(7, 8),
+                Node(8, 6),
+                Node(8, 7),
+            ]
+            for winning_node in winning:
+                if (
+                    row == winning_node.row or col == winning_node.col
+                ) and self._is_valid_movement(chess_board, current_node, winning_node):
+                    score += 5
 
-            for x in range(current_node.row - 1, current_node.row + 2):
-                for y in range(current_node.col - 1, current_node.col + 2):
-                    if x < 0 or x > 8 or y < 0 or y > 8:
-                        continue
-                    piece = chess_board[x][y]
-                    if piece == CHESS.BLACK and self.dist(x, y, current_node) == 1:
-                        score -= 1
-                        neighbor = Node(x, y)
-                    if score == -2:
-                        break
+        # Directions in which an enemy piece stands right next to this piece.
+        enemy = CHESS.BLACK if role == ROLE.WHITE else CHESS.WHITE
+        enemies = [
+            (d_row, d_col)
+            for d_row, d_col in DIRECTIONS
+            if 0 <= row + d_row <= 8
+            and 0 <= col + d_col <= 8
+            and chess_board[row + d_row][col + d_col] == enemy
+        ]
 
-            if score == -1 and neighbor != None:
-                for x in range(neighbor.row - 1, neighbor.row + 2):
-                    for y in range(neighbor.col - 1, neighbor.col + 2):
-                        if x < 0 or x > 8 or y < 0 or y > 8:
-                            continue
-                        piece = chess_board[x][y]
-                        if (
-                            self.dist(x, y, neighbor) == 1
-                            and piece == CHESS.WHITE
-                            and (x == current_node.row or y == current_node.col)
-                            and (Node(x, y) != current_node)
-                        ):
-                            score += 3
+        # White: every adjacent black is a threat.
+        # Black: every adjacent white is a target.
+        # At most two count: two enemies on opposite sides already capture.
+        pressure = min(len(enemies), 2)
+        score += -pressure if role == ROLE.WHITE else pressure
 
-        # Black:
-        else:
-            for x in range(current_node.row - 1, current_node.row + 2):
-                for y in range(current_node.col - 1, current_node.col + 2):
-                    if x < 0 or x > 8 or y < 0 or y > 8:
-                        continue
-                    piece = chess_board[x][y]
-                    if piece == CHESS.WHITE and self.dist(x, y, current_node) == 1:
-                        score += 1
-                    if score == 2:
-                        break
-            if score == 1 and neighbor != None:
-                for x in range(neighbor.row - 1, neighbor.row + 2):
-                    for y in range(neighbor.col - 1, neighbor.col + 2):
-                        if x < 0 or x > 8 or y < 0 or y > 8:
-                            continue
-                        piece = chess_board[x][y]
-                        if (
-                            self.dist(x, y, neighbor) == 1
-                            and piece == CHESS.WHITE
-                            and (x == current_node.row or y == current_node.col)
-                            and (Node(x, y) != neighbor)
-                        ):
-                            score -= 3
+        # With exactly one enemy, look at the cell right behind it.
+        if len(enemies) == 1:
+            d_row, d_col = enemies[0]
+            behind_row, behind_col = row + 2 * d_row, col + 2 * d_col
+            if (
+                0 <= behind_row <= 8
+                and 0 <= behind_col <= 8
+                and chess_board[behind_row][behind_col] == CHESS.WHITE
+            ):
+                # White: the attacker stands between two white pieces.
+                # Black: the target is covered by a white piece, no sandwich.
+                score += 3 if role == ROLE.WHITE else -3
+
         return score
 
     # The same "state" of the game is reached twice: draw
@@ -149,31 +128,24 @@ class CookedTablut(CookedTree):
         if king in winning:
             return GAME_STATUS.WHITE_WIN
 
-        check = False
-
         my_chess = super()._get_alive_chess(chess_board, role)
 
+        # One legal move is enough: the side to move is not blocked.
         for piece in my_chess:
             for x in range(9):
                 if piece.row == x:
                     continue
                 if self._is_valid_movement(chess_board, piece, Node(x, piece.col)):
-                    check = True
-                    break
+                    return GAME_STATUS.ONGOING
 
             for y in range(9):
                 if piece.col == y:
                     continue
                 if self._is_valid_movement(chess_board, piece, Node(piece.row, y)):
-                    check = True
-                    break
+                    return GAME_STATUS.ONGOING
 
-        if not check and role == ROLE.WHITE:
-            return GAME_STATUS.BLACK_WIN
-        elif not check and role == ROLE.BLACK:
-            return GAME_STATUS.WHITE_WIN
-
-        return GAME_STATUS.ONGOING
+        # A player that cannot move any piece loses.
+        return GAME_STATUS.BLACK_WIN if role == ROLE.WHITE else GAME_STATUS.WHITE_WIN
 
     def _is_valid_movement(
         self, chess_board: Board, from_node: Node, to_node: Node

@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 
 from tablut.common.enums.chess import CHESS
 from tablut.common.enums.game_status import GAME_STATUS
@@ -6,7 +7,6 @@ from tablut.common.enums.player import ROLE
 from tablut.common.enums.turn import TURN
 from tablut.common.types.receive_state import ReceiveStateType
 from tablut.cooked_tablut.cooked_tablut import CookedTablut
-from tablut.game.depth_benchmark import DEPTH_BENCHMARK
 from tablut.network.socket_client import SocketClient
 from tablut.utils.logger import Logger
 from tablut.utils.tools import Timer, Tools
@@ -36,36 +36,6 @@ class ChessGameInterface:
         self.__server = SocketClient(role=self.__role, host=host)
         self.__cooked_tree = CookedTablut()
         self.logger = Logger(f"ChessGame_{player_name}")
-        self.__max_depth: int = self.__calculate_optimal_depth(time_out)
-
-    def __calculate_optimal_depth(self, time_out: float) -> int:
-        """
-        Calculate optimal search depth based on time budget using pre-computed benchmark table.
-
-        Strategy:
-        1. Calculate available time: time_out - KEEP_TIME_OUT (3s safety margin)
-        2. Apply additional safety margin: 0.8x (20% buffer for network latency, etc)
-        3. Find maximum depth where benchmark time < safe budget
-
-        Args:
-            time_out: Total time allocated in seconds
-
-        Returns:
-            Optimal max_depth for minimax search
-        """
-        available_time = time_out - ChessGameInterface.KEEP_TIME_OUT
-        safe_budget = available_time * 0.8
-
-        optimal_depth = 3  # Fallback minimum
-
-        for depth in sorted(DEPTH_BENCHMARK.keys()):
-            if DEPTH_BENCHMARK[depth] < safe_budget:
-                optimal_depth = depth
-            else:
-                break
-
-        self.logger.info(f"Calculated optimal depth: {optimal_depth}")
-        return optimal_depth
 
     def __next_move(self) -> None:
         self.logger.info("Getting next move")
@@ -79,8 +49,9 @@ class ChessGameInterface:
             self.logger.info(
                 f"Sent move from {move_from} to {move_to} (took {self.__timer.elapsed():.2f}s)"
             )
-        except Exception as e:
-            self.logger.error(f"Failed to send move: {e}")
+        except Exception:
+            # No move was sent: keep the whole traceback to find the cause.
+            self.logger.error(f"Failed to send move:\n{traceback.format_exc()}")
 
     def __update_chessboard(self, chess_board: list[list[CHESS]]) -> None:
         self.logger.info("Updating the chess board")
@@ -89,17 +60,18 @@ class ChessGameInterface:
     async def __get_movement(
         self, timer: Timer
     ) -> tuple[tuple[int, int], tuple[int, int]]:
-        try:
-            movement = self.__cooked_tree.get_next_movement(
-                self.__chess_board, self.__role, self.__max_depth
-            )
-            return (movement.from_node.row, movement.from_node.col), (
-                movement.to_node.row,
-                movement.to_node.col,
-            )
-        except:
-            self.logger.error("Failed to get movement")
-            raise RuntimeError("Failed to get movement")
+        # Iterative deepening: goes as deep as the remaining time allows.
+        movement = self.__cooked_tree.get_next_movement_in_time(
+            self.__chess_board, self.__role, timer.remaining()
+        )
+        self.logger.info(
+            f"Searched to depth {self.__cooked_tree.completed_depth} "
+            f"(score {movement.score})"
+        )
+        return (movement.from_node.row, movement.from_node.col), (
+            movement.to_node.row,
+            movement.to_node.col,
+        )
 
     def __initialize(self) -> None:
         try:

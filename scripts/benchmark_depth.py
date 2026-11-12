@@ -252,9 +252,9 @@ DEPTH_BENCHMARK = {dict_str}
                 self.logger.info(f"Average: {avg_time:.3f}s")
 
                 # Safety check: if taking too long, stop
-                if avg_time > 80:
+                if avg_time > 60:
                     self.logger.warning(
-                        f"Depth {depth} exceeded 80s, stopping benchmarks"
+                        f"Depth {depth} exceeded 60s, stopping benchmarks"
                     )
                     break
 
