@@ -14,7 +14,7 @@ class CookedTablut(CookedTree):
 
     def _get_heuristic(self, chess_board: Board, role: ROLE) -> int:
         scores = []
-        alive = self.__get_alive_chess(chess_board, role)
+        alive = super()._get_alive_chess(chess_board, role)
         for piece in alive:
             scores.append(self.get_score(piece, chess_board, role))
         heuristic = sum(scores)
@@ -55,6 +55,8 @@ class CookedTablut(CookedTree):
 
             for x in range(current_node.row - 1, current_node.row + 2):
                 for y in range(current_node.col - 1, current_node.col + 2):
+                    if x < 0 or x > 8 or y < 0 or y > 8:
+                        continue
                     piece = chess_board[x][y]
                     if piece == CHESS.BLACK and self.dist(x, y, current_node) == 1:
                         score -= 1
@@ -78,24 +80,26 @@ class CookedTablut(CookedTree):
 
         # Black:
         else:
-            for x in range(Node.row - 1, Node.row + 2):
-                for y in range(Node.col - 1, Node.col + 2):
+            for x in range(current_node.row - 1, current_node.row + 2):
+                for y in range(current_node.col - 1, current_node.col + 2):
                     if x < 0 or x > 8 or y < 0 or y > 8:
                         continue
                     piece = chess_board[x][y]
-                    if piece == CHESS.WHITE and self.dist(x, y, Node) == 1:
+                    if piece == CHESS.WHITE and self.dist(x, y, current_node) == 1:
                         score += 1
                     if score == 2:
                         break
             if score == 1 and neighbor != None:
                 for x in range(neighbor.row - 1, neighbor.row + 2):
                     for y in range(neighbor.col - 1, neighbor.col + 2):
+                        if x < 0 or x > 8 or y < 0 or y > 8:
+                            continue
                         piece = chess_board[x][y]
                         if (
                             self.dist(x, y, neighbor) == 1
                             and piece == CHESS.WHITE
                             and (x == current_node.row or y == current_node.col)
-                            and (Node(x, y) != current_node)
+                            and (Node(x, y) != neighbor)
                         ):
                             score -= 3
         return score
@@ -132,6 +136,8 @@ class CookedTablut(CookedTree):
         n_surrounding = 0
         for x in range(king.row - 1, king.row + 2):
             for y in range(king.col - 1, king.col + 2):
+                if x < 0 or x > 8 or y < 0 or y > 8:
+                    continue
                 if chess_board[x][y] == CHESS.BLACK:
                     surrounding.append(Node(x, y))
                     n_surrounding += 1
@@ -144,7 +150,7 @@ class CookedTablut(CookedTree):
             return GAME_STATUS.BLACK_WIN
         check = False
 
-        my_chess = self.__get_alive_chess(chess_board, role)
+        my_chess = super()._get_alive_chess(chess_board, role)
 
         for piece in my_chess:
             for x in range(9):
@@ -207,7 +213,6 @@ class CookedTablut(CookedTree):
         camps_low = [Node(3, 0), Node(4, 0), Node(5, 0), Node(4, 1)]
         camps_up = [Node(3, 8), Node(4, 8), Node(5, 8), Node(4, 7)]
 
-        # TODO: Check this logic, is from_node necessarily in this condition
         if to_node in camps_left and from_node not in camps_left:
             return False
         if to_node in camps_low and from_node not in camps_low:

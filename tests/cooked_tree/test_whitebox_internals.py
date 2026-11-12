@@ -61,7 +61,7 @@ def test_wb02_white_includes_king_and_is_row_major():
         }
     )
 
-    alive = private(CookedTree(), "get_alive_chess")(board, ROLE.WHITE)
+    alive = CookedTree()._get_alive_chess(board, ROLE.WHITE)
 
     assert [as_pos(n) for n in alive] == [(2, 6), (4, 4), (7, 1)]
 
@@ -69,14 +69,14 @@ def test_wb02_white_includes_king_and_is_row_major():
 def test_wb02_black_only_black_pieces():
     board = make_board({(7, 1): CHESS.WHITE, (4, 4): CHESS.KING, (0, 0): CHESS.BLACK})
 
-    alive = private(CookedTree(), "get_alive_chess")(board, ROLE.BLACK)
+    alive = CookedTree()._get_alive_chess(board, ROLE.BLACK)
 
     assert [as_pos(n) for n in alive] == [(0, 0)]
 
 
 @pytest.mark.parametrize("role", [ROLE.WHITE, ROLE.BLACK])
 def test_wb02_no_pieces_means_empty_list(role):
-    alive = private(CookedTree(), "get_alive_chess")(make_board({}), role)
+    alive = CookedTree()._get_alive_chess(make_board({}), role)
 
     assert alive == []  # the empty THRONE cell is not a piece
 
@@ -151,22 +151,19 @@ def test_wb07_default_rules_are_the_placeholder_implementations():
     tree = CookedTree()
     board = make_board({})
 
-    assert tree._game_status(board, ROLE.WHITE) == GAME_STATUS.ONGOING
+    assert tree._get_game_status(board, ROLE.WHITE) == GAME_STATUS.ONGOING
     assert tree._is_valid_movement(board, Node(0, 0), Node(0, 1)) is True
-    assert all(-100 <= tree._heuristic(board, ROLE.WHITE) <= 100 for _ in range(50))
+    assert all(-100 <= tree._get_heuristic(board, ROLE.WHITE) <= 100 for _ in range(50))
 
 
 def test_wb08_injected_rules_replace_the_defaults():
-    heuristic = constant_heuristic(1)
-    status = always(GAME_STATUS.DRAW)
+    board = make_board({(3, 3): CHESS.WHITE})
+    tree = make_tree(constant_heuristic(1), always(GAME_STATUS.DRAW))
 
-    tree = CookedTree(
-        heuristic=heuristic, game_status=status, is_valid_movement=rook_is_valid
-    )
-
-    assert tree._heuristic is heuristic
-    assert tree._game_status is status
-    assert tree._is_valid_movement is rook_is_valid
+    assert tree._get_heuristic(board, ROLE.WHITE) == 1
+    assert tree._get_game_status(board, ROLE.WHITE) == GAME_STATUS.DRAW
+    assert tree._is_valid_movement(board, Node(3, 3), Node(3, 4)) is True
+    assert tree._is_valid_movement(board, Node(3, 3), Node(4, 4)) is False
 
 
 # ------------------------------------- WB-09/10 evaluation order & roles
@@ -351,7 +348,7 @@ def test_wb14_oracle_move_generator_agrees_with_the_fake_rule(seed, role):
     produce exactly the moves the rook rule accepts for the tree's vectors."""
     board = random_board(seed, 2, 3)
     tree = CookedTree()
-    alive = private(tree, "get_alive_chess")(board, role)
+    alive = tree._get_alive_chess(board, role)
 
     by_rule = {
         (as_pos(piece), (piece.row + d_row, piece.col + d_col))
@@ -363,12 +360,11 @@ def test_wb14_oracle_move_generator_agrees_with_the_fake_rule(seed, role):
     assert set(legal_moves(board, role)) == by_rule
 
 
-def test_wb13_default_heuristic_uses_get_score():
-    """Test that __get_heuristic is called when no custom heuristic is injected."""
+def test_wb13_default_heuristic_returns_an_int():
+    """The base class heuristic is a placeholder that still returns an int."""
     tree = CookedTree()
     board = make_board({(3, 3): CHESS.WHITE, (5, 5): CHESS.BLACK})
 
-    # This should use the default __get_heuristic which calls get_score
-    result = tree._heuristic(board, ROLE.WHITE)
+    result = tree._get_heuristic(board, ROLE.WHITE)
 
     assert isinstance(result, int)

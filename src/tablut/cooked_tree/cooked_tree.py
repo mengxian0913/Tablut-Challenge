@@ -18,7 +18,7 @@ class CookedTree:
         self.move_row: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, -1, -2, -3, -4, -5, -6, -7, -8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # fmt: skip # noqa: E501
         self.move_col: list[int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, -1, -2, -3, -4, -5, -6, -7, -8]  # fmt: skip # noqa: E501
 
-    def __get_alive_chess(
+    def _get_alive_chess(
         self, chess_board: list[list[CHESS]], role: ROLE
     ) -> list[Node]:
         alive_chess: list[Node] = []
@@ -77,7 +77,7 @@ class CookedTree:
         self, chess_board: Board, role: ROLE, max_depth: int
     ) -> Best_Movement:
 
-        alive_chess = self.__get_alive_chess(chess_board, role)
+        alive_chess = self._get_alive_chess(chess_board, role)
 
         best_from: Node = Node(-1, -1)
         best_to: Node = Node(-1, -1)
@@ -151,7 +151,7 @@ class CookedTree:
         if cur_depth >= max_depth:
             return self._get_heuristic(chess_board, role)
 
-        alive_chess: list[Node] = self.__get_alive_chess(chess_board, role)
+        alive_chess: list[Node] = self._get_alive_chess(chess_board, role)
 
         best: int = -self.INF if role == ROLE.WHITE else self.INF
 
