@@ -5,6 +5,8 @@ from tablut.common.enums.game_status import GAME_STATUS
 from tablut.common.enums.player import ROLE
 from tablut.common.enums.turn import TURN
 from tablut.common.types.receive_state import ReceiveStateType
+from tablut.cook_tablut.cook_tablut import CookedTablut
+from tablut.game.depth_benchmark import DEPTH_BENCHMARK
 from tablut.network.socket_client import SocketClient
 from tablut.utils.logger import Logger
 from tablut.utils.tools import Timer, Tools
@@ -29,9 +31,40 @@ class ChessGameInterface:
         # Assets
         self.__role: ROLE = role
         self.__player_name = player_name
+        self.__time_out = time_out
         self.__timer = Timer(time_out - ChessGameInterface.KEEP_TIME_OUT)
         self.__server = SocketClient(role=self.__role, host=host)
+        self.__cooked_tree = CookedTablut()
+        self.__max_depth: int = self.__calculate_optimal_depth(time_out)
         self.logger = Logger(f"ChessGame_{player_name}")
+
+    def __calculate_optimal_depth(self, time_out: float) -> int:
+        """
+        Calculate optimal search depth based on time budget using pre-computed benchmark table.
+        
+        Strategy:
+        1. Calculate available time: time_out - KEEP_TIME_OUT (3s safety margin)
+        2. Apply additional safety margin: 0.8x (20% buffer for network latency, etc)
+        3. Find maximum depth where benchmark time < safe budget
+        
+        Args:
+            time_out: Total time allocated in seconds
+            
+        Returns:
+            Optimal max_depth for minimax search
+        """
+        available_time = time_out - ChessGameInterface.KEEP_TIME_OUT
+        safe_budget = available_time * 0.8
+        
+        optimal_depth = 3  # Fallback minimum
+        
+        for depth in sorted(DEPTH_BENCHMARK.keys()):
+            if DEPTH_BENCHMARK[depth] < safe_budget:
+                optimal_depth = depth
+            else:
+                break
+        
+        return optimal_depth
 
     def __next_move(self) -> None:
         self.logger.info("Getting next move")
@@ -55,27 +88,18 @@ class ChessGameInterface:
     async def __get_movement(
         self, timer: Timer
     ) -> tuple[tuple[int, int], tuple[int, int]]:
-        """
-        Calculate next move with time constraint.
-
-        Args:
-            timer: Timer instance to track elapsed time
-
-        Returns:
-            ((from_row, from_col), (to_row, to_col)) in array indices
-        """
-        # Test: WHITE plays one move, BLACK simulates timeout
-        if self.__role == ROLE.WHITE:
-            # White: e4 to f4 (row 3, col 4->5) - Legal move on empty square
-            return ((3, 4), (3, 5))
-        else:
-            # BLACK: simulate timeout by waiting longer than available time
-            try:
-                await asyncio.sleep(timer.remaining() + 1)
-                return ((1, 1), (2, 2))
-            except TimeoutError:
-                self.logger.info("BLACK timeout during move calculation")
-                return ((1, 1), (2, 2))
+        try:
+            # TODO: Implement here with time constraint and proper depth: self.__max_depth
+            movement = self.__cooked_tree.get_next_movement(
+                self.__chess_board, self.__role, 10
+            )
+            return (movement.from_node.row, movement.from_node.col), (
+                movement.to_node.row,
+                movement.to_node.col,
+            )
+        except:
+            self.logger.error("Failed to get movement")
+            raise RuntimeError("Failed to get movement")
 
     def __initialize(self) -> None:
         try:
