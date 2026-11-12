@@ -5,7 +5,7 @@ from tablut.common.types.algorithm import Board, Node
 from tablut.cooked_tree.cooked_tree import CookedTree
 
 
-class CookTablut(CookedTree):
+class CookedTablut(CookedTree):
     def dist(self, x, y, Node):
         x_dist = abs(x - Node.row)
         y_dist = abs(y - Node.col)
@@ -44,21 +44,25 @@ class CookTablut(CookedTree):
                     Node(8, 6),
                     Node(8, 7),
                 ]
-                for piece in winning:
+                for winning_node in winning:
                     if (
-                        current_node.row == piece.row or current_node.col == piece.col
-                    ) and self._is_valid_movement(chess_board, current_node, piece):
+                        current_node.row == winning_node.row
+                        or current_node.col == winning_node.col
+                    ) and self._is_valid_movement(
+                        chess_board, current_node, winning_node
+                    ):
                         score += 5
 
-            for x in range(Node.row - 1, Node.row + 2):
-                for y in range(Node.col - 1, Node.col + 2):
+            for x in range(current_node.row - 1, current_node.row + 2):
+                for y in range(current_node.col - 1, current_node.col + 2):
                     piece = chess_board[x][y]
                     if piece == CHESS.BLACK and self.dist(x, y, current_node) == 1:
                         score -= 1
                         neighbor = Node(x, y)
                     if score == -2:
                         break
-            if score == -1:
+
+            if score == -1 and neighbor != None:
                 for x in range(neighbor.row - 1, neighbor.row + 2):
                     for y in range(neighbor.col - 1, neighbor.col + 2):
                         if x < 0 or x > 8 or y < 0 or y > 8:
@@ -66,7 +70,7 @@ class CookTablut(CookedTree):
                         piece = chess_board[x][y]
                         if (
                             self.dist(x, y, neighbor) == 1
-                            and piece.role == "white"
+                            and piece == CHESS.WHITE
                             and (x == current_node.row or y == current_node.col)
                             and (Node(x, y) != current_node)
                         ):
@@ -83,14 +87,14 @@ class CookTablut(CookedTree):
                         score += 1
                     if score == 2:
                         break
-            if score == 1:
-                for x in range(neighbor.row - 1, neighbor.col + 2):
+            if score == 1 and neighbor != None:
+                for x in range(neighbor.row - 1, neighbor.row + 2):
                     for y in range(neighbor.col - 1, neighbor.col + 2):
                         piece = chess_board[x][y]
                         if (
                             self.dist(x, y, neighbor) == 1
-                            and piece.role == "white"
-                            and (x == current_node.row or y == current_node.column)
+                            and piece == CHESS.WHITE
+                            and (x == current_node.row or y == current_node.col)
                             and (Node(x, y) != current_node)
                         ):
                             score -= 3
@@ -123,6 +127,7 @@ class CookTablut(CookedTree):
         ]
         if king in winning:
             return GAME_STATUS.WHITE_WIN
+
         surrounding = []
         n_surrounding = 0
         for x in range(king.row - 1, king.row + 2):
@@ -138,32 +143,24 @@ class CookTablut(CookedTree):
         ):
             return GAME_STATUS.BLACK_WIN
         check = False
+
         my_chess = self.__get_alive_chess(chess_board, role)
+
         for piece in my_chess:
-            for x in range(my_chess.row, 8):
-                if self._is_valid_movement(
-                    chess_board, my_chess, Node(x, my_chess.col)
-                ):
+            for x in range(9):
+                if piece.row == x:
+                    continue
+                if self._is_valid_movement(chess_board, piece, Node(x, piece.col)):
                     check = True
                     break
-            for x in range(0, my_chess.row):
-                if self._is_valid_movement(
-                    chess_board, my_chess, Node(x, my_chess.col)
-                ):
+
+            for y in range(9):
+                if piece.col == y:
+                    continue
+                if self._is_valid_movement(chess_board, piece, Node(piece.row, y)):
                     check = True
                     break
-            for y in range(my_chess.col, 8):
-                if self._is_valid_movement(
-                    chess_board, my_chess, Node(my_chess.row, y)
-                ):
-                    check = True
-                    break
-            for y in range(0, my_chess.col):
-                if self._is_valid_movement(
-                    chess_board, my_chess, Node(my_chess.row, y)
-                ):
-                    check = True
-                    break
+
         if not check and role == ROLE.WHITE:
             return GAME_STATUS.BLACK_WIN
         elif not check and role == ROLE.BLACK:
@@ -174,6 +171,13 @@ class CookTablut(CookedTree):
     def _is_valid_movement(
         self, chess_board: Board, from_node: Node, to_node: Node
     ) -> bool:
+
+        if from_node.row == to_node.row and from_node.col == to_node.col:
+            return False
+
+        if from_node.row != to_node.row and from_node.col != to_node.col:
+            return False
+
         if to_node.row < 0 or to_node.row > 8 or to_node.col < 0 or to_node.col > 8:
             return False
 
@@ -184,11 +188,12 @@ class CookTablut(CookedTree):
         ):
             return False
 
-        for y in range(
-            min(from_node.col, to_node.col) + 1, max(from_node.col, to_node.col) + 1
-        ):
-            if chess_board[from_node.row][y] != CHESS.EMPTY:
-                return False
+        if from_node.row == to_node.row:
+            for y in range(
+                min(from_node.col, to_node.col) + 1, max(from_node.col, to_node.col) + 1
+            ):
+                if chess_board[from_node.row][y] != CHESS.EMPTY:
+                    return False
 
         if from_node.col == to_node.col:
             for x in range(
@@ -202,6 +207,7 @@ class CookTablut(CookedTree):
         camps_low = [Node(3, 0), Node(4, 0), Node(5, 0), Node(4, 1)]
         camps_up = [Node(3, 8), Node(4, 8), Node(5, 8), Node(4, 7)]
 
+        # TODO: Check this logic, is from_node necessarily in this condition
         if to_node in camps_left and from_node not in camps_left:
             return False
         if to_node in camps_low and from_node not in camps_low:

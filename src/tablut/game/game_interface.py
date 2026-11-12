@@ -5,7 +5,7 @@ from tablut.common.enums.game_status import GAME_STATUS
 from tablut.common.enums.player import ROLE
 from tablut.common.enums.turn import TURN
 from tablut.common.types.receive_state import ReceiveStateType
-from tablut.cook_tablut.cook_tablut import CookedTablut
+from tablut.cooked_tablut.cooked_tablut import CookedTablut
 from tablut.game.depth_benchmark import DEPTH_BENCHMARK
 from tablut.network.socket_client import SocketClient
 from tablut.utils.logger import Logger
@@ -41,29 +41,29 @@ class ChessGameInterface:
     def __calculate_optimal_depth(self, time_out: float) -> int:
         """
         Calculate optimal search depth based on time budget using pre-computed benchmark table.
-        
+
         Strategy:
         1. Calculate available time: time_out - KEEP_TIME_OUT (3s safety margin)
         2. Apply additional safety margin: 0.8x (20% buffer for network latency, etc)
         3. Find maximum depth where benchmark time < safe budget
-        
+
         Args:
             time_out: Total time allocated in seconds
-            
+
         Returns:
             Optimal max_depth for minimax search
         """
         available_time = time_out - ChessGameInterface.KEEP_TIME_OUT
         safe_budget = available_time * 0.8
-        
+
         optimal_depth = 3  # Fallback minimum
-        
+
         for depth in sorted(DEPTH_BENCHMARK.keys()):
             if DEPTH_BENCHMARK[depth] < safe_budget:
                 optimal_depth = depth
             else:
                 break
-        
+
         return optimal_depth
 
     def __next_move(self) -> None:

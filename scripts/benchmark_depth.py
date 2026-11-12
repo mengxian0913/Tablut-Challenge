@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.tablut.cook_tablut.cook_tablut import CookedTablut
+from tablut.cooked_tablut.cooked_tablut import CookedTablut
 from src.tablut.common.enums.player import ROLE
 from src.tablut.common.enums.chess import CHESS
 from src.tablut.utils.logger import Logger
