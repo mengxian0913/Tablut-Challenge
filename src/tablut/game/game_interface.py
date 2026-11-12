@@ -35,8 +35,8 @@ class ChessGameInterface:
         self.__timer = Timer(time_out - ChessGameInterface.KEEP_TIME_OUT)
         self.__server = SocketClient(role=self.__role, host=host)
         self.__cooked_tree = CookedTablut()
-        self.__max_depth: int = self.__calculate_optimal_depth(time_out)
         self.logger = Logger(f"ChessGame_{player_name}")
+        self.__max_depth: int = self.__calculate_optimal_depth(time_out)
 
     def __calculate_optimal_depth(self, time_out: float) -> int:
         """
@@ -64,6 +64,7 @@ class ChessGameInterface:
             else:
                 break
 
+        self.logger.info(f"Calculated optimal depth: {optimal_depth}")
         return optimal_depth
 
     def __next_move(self) -> None:
@@ -89,9 +90,8 @@ class ChessGameInterface:
         self, timer: Timer
     ) -> tuple[tuple[int, int], tuple[int, int]]:
         try:
-            # TODO: Implement here with time constraint and proper depth: self.__max_depth
             movement = self.__cooked_tree.get_next_movement(
-                self.__chess_board, self.__role, 10
+                self.__chess_board, self.__role, self.__max_depth
             )
             return (movement.from_node.row, movement.from_node.col), (
                 movement.to_node.row,

@@ -13,7 +13,8 @@ spot in real games, so automated tests have to catch it.
 | Scope | Description |
 |---|---|
 | In scope | Search logic, alpha-beta pruning, make/undo move, root move selection, order of the terminal/depth checks, piece enumeration |
-| Out of scope | **The Tablut rules themselves** (legal moves, captures, end of game, repeated positions) and **heuristic quality**: they are not implemented yet and will be checked against the referee's Java engine |
+| Out of scope | **Repeated positions (draw)** and **heuristic quality**: not implemented / not verified yet |
+| Covered separately | **The Tablut rules** in `CookedTablut` (legal moves, captures, king capture): [`tests/cooked_tablut/test_tablut_rules.py`](../../tests/cooked_tablut/test_tablut_rules.py), with expected results taken from the referee's Java engine (`GameAshtonTablut.java`) |
 | Out of scope | Network/socket layer and `game_interface` (they need the referee server; the manual scripts in `src/test/_*.py` cover them) |
 
 > These tests verify that **the search is correct for any rule set**, not that the Tablut rules are correct.
@@ -83,8 +84,8 @@ Designed from the internal structure; the target is **every branch** and **every
 | BB-12 | Black-box / boundary | The longest (8-cell) slide in all four directions, seen both at the root and at deeper nodes |
 | WB-01 | White-box | Move-vector table: 32 entries, no duplicates, every rook displacement |
 | WB-02 | White-box | Piece enumeration: White includes the king, row-major order; Black only black pieces; an empty board gives an empty list |
-| WB-03~06 | White-box | Make/undo: plain move, leaving the throne leaves `THRONE`, target restored to its original content, king round trip through the throne |
-| WB-07 | White-box / characterization | Default rules are placeholders (update when the real rules are implemented) |
+| WB-03~06 | White-box | Make/undo: plain move, leaving the throne leaves `THRONE`, target restored to its original content, captured pieces removed and restored by undo, king round trip through the throne |
+| WB-07 | White-box / characterization | Default rules of the base class are placeholders (no captures) |
 | WB-08 | White-box | Injected rules replace the defaults |
 | WB-09 | White-box / spy | The terminal check comes before the depth cut-off; decided nodes never call the heuristic |
 | WB-10 | White-box / spy | Rule functions receive the side to move |
@@ -123,7 +124,7 @@ uv run pytest -m whitebox          # white-box only
 uv run pytest --cov=tablut.cooked_tree --cov-branch --cov-report=term-missing   # coverage report
 ```
 
-The whole suite takes about 10 seconds (145 tests).
+The whole suite takes about 10 seconds (180 tests).
 
 ## 7. Git commit workflow
 
@@ -149,16 +150,17 @@ tests, not the linter (the project still has pre-existing `E501` errors in `game
    - **Transposition table**: the BB-01 differential test must still pass (it is the most important safety
      net); also add a test that a cache hit gives the same result as a miss.
    - **C++ port**: compare the Python and C++ scores on the same random boards.
-3. **Once the real rules exist**: update WB-07; add rule tests that use the referee's Java engine as the
-   reference (legal moves, captures, end of game, repeated positions); make `__make_move` / `__undo_move`
-   restore captured pieces (extend WB-05).
+3. **Rules**: captures are applied by `__make_move` through the `_get_captures` hook and restored by
+   `__undo_move` (WB-05). When a rule in `CookedTablut` changes, update
+   `tests/cooked_tablut/test_tablut_rules.py` using the referee's Java engine as the reference.
+   Repeated positions (draw) are still to be added.
 4. When adding features, first check that 100% coverage still holds, then cover the new operators and
    boundaries with new tests.
 
 ## 9. Known gaps
 
-- The rules (captures, special throne and camp rules, repeated positions) and the heuristic are not
-  implemented yet, so they have no tests.
+- Repeated positions (draw) are not implemented, and the heuristic has no tests.
+- The rule tests are hand-written cases derived from the referee's source; there is no automated
+  differential test against the Java engine.
 - Mutation testing is run by hand and is not part of CI; repeat it after any large change to the search.
-- The tests use simplified rook-like fake rules, so bugs in how move generation interacts with the real
-  rules are not covered.
+- The search tests use simplified rook-like fake rules; only two tests run the search with the real rules.

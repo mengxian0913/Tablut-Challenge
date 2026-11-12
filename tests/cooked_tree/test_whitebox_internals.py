@@ -88,9 +88,9 @@ def test_wb03_make_move_moves_the_piece():
     board = make_board({(2, 2): CHESS.WHITE})
     tree = CookedTree()
 
-    piece, old = private(tree, "make_move")(board, Node(2, 2), Node(2, 7))
+    piece, old, captured = private(tree, "make_move")(board, Node(2, 2), Node(2, 7))
 
-    assert (piece, old) == (CHESS.WHITE, CHESS.EMPTY)
+    assert (piece, old, captured) == (CHESS.WHITE, CHESS.EMPTY, [])
     assert board[2][2] == CHESS.EMPTY
     assert board[2][7] == CHESS.WHITE
 
@@ -118,15 +118,38 @@ def test_wb04_leaving_a_normal_cell_leaves_it_empty():
 )
 def test_wb05_undo_restores_whatever_was_on_the_target(target_piece):
     """The target is restored to its ORIGINAL content, not forced to EMPTY
-    (it matters for the throne and for the future capture logic)."""
+    (it matters for the throne)."""
     board = make_board({(0, 0): CHESS.KING})
     board[0][5] = target_piece
     original = copy_board(board)
     tree = CookedTree()
 
-    piece, old = private(tree, "make_move")(board, Node(0, 0), Node(0, 5))
-    private(tree, "undo_move")(board, Node(0, 0), Node(0, 5), piece, old)
+    piece, old, captured = private(tree, "make_move")(board, Node(0, 0), Node(0, 5))
+    private(tree, "undo_move")(board, Node(0, 0), Node(0, 5), piece, old, captured)
 
+    assert board == original
+
+
+def test_wb05_captured_pieces_are_removed_and_restored_by_undo():
+    """A captured king on the throne leaves a THRONE cell, like a vacated one."""
+
+    class CapturingTree(CookedTree):
+        def _get_captures(self, chess_board, to_node):
+            return [Node(2, 3), Node(*THRONE_POS)]
+
+    board = make_board(
+        {(2, 0): CHESS.BLACK, (2, 3): CHESS.WHITE, THRONE_POS: CHESS.KING}
+    )
+    original = copy_board(board)
+    tree = CapturingTree()
+
+    piece, old, captured = private(tree, "make_move")(board, Node(2, 0), Node(2, 2))
+
+    assert captured == [(Node(2, 3), CHESS.WHITE), (Node(*THRONE_POS), CHESS.KING)]
+    assert board[2][3] == CHESS.EMPTY
+    assert board[THRONE_POS[0]][THRONE_POS[1]] == CHESS.THRONE
+
+    private(tree, "undo_move")(board, Node(2, 0), Node(2, 2), piece, old, captured)
     assert board == original
 
 
@@ -135,11 +158,15 @@ def test_wb06_king_returning_to_the_throne_round_trip():
     original = copy_board(board)
     tree = CookedTree()
 
-    piece, old = private(tree, "make_move")(board, Node(4, 6), Node(*THRONE_POS))
+    piece, old, captured = private(tree, "make_move")(
+        board, Node(4, 6), Node(*THRONE_POS)
+    )
     assert board[4][4] == CHESS.KING and board[4][6] == CHESS.EMPTY
     assert old == CHESS.THRONE
 
-    private(tree, "undo_move")(board, Node(4, 6), Node(*THRONE_POS), piece, old)
+    private(tree, "undo_move")(
+        board, Node(4, 6), Node(*THRONE_POS), piece, old, captured
+    )
     assert board == original
 
 
@@ -153,6 +180,7 @@ def test_wb07_default_rules_are_the_placeholder_implementations():
 
     assert tree._get_game_status(board, ROLE.WHITE) == GAME_STATUS.ONGOING
     assert tree._is_valid_movement(board, Node(0, 0), Node(0, 1)) is True
+    assert tree._get_captures(board, Node(0, 1)) == []
     assert all(-100 <= tree._get_heuristic(board, ROLE.WHITE) <= 100 for _ in range(50))
 
 

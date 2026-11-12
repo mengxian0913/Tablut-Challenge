@@ -4,6 +4,19 @@ from tablut.common.enums.player import ROLE
 from tablut.common.types.algorithm import Board, Node
 from tablut.cooked_tree.cooked_tree import CookedTree
 
+DIRECTIONS = ((1, 0), (-1, 0), (0, 1), (0, -1))
+CASTLE = (4, 4)
+CAMP_CELLS = frozenset(
+    {
+        (0, 3), (0, 4), (0, 5), (1, 4),
+        (8, 3), (8, 4), (8, 5), (7, 4),
+        (3, 0), (4, 0), (5, 0), (4, 1),
+        (3, 8), (4, 8), (5, 8), (4, 7),
+    }
+)  # fmt: skip
+# The referee does not let White capture against these four camp cells.
+CAMP_EDGE_CENTERS = frozenset({(0, 4), (8, 4), (4, 0), (4, 8)})
+
 
 class CookedTablut(CookedTree):
     def dist(self, x, y, Node):
@@ -106,11 +119,15 @@ class CookedTablut(CookedTree):
 
     # The same "state" of the game is reached twice: draw
     def _get_game_status(self, chess_board: Board, role: ROLE) -> GAME_STATUS:
+        king: Node | None = None
         for x in range(0, 9):
             for y in range(0, 9):
                 if chess_board[x][y] == CHESS.KING:
                     king = Node(x, y)
                     break
+        # The king is removed from the board when it is captured.
+        if king is None:
+            return GAME_STATUS.BLACK_WIN
         winning = [
             Node(0, 1),
             Node(0, 2),
@@ -132,22 +149,6 @@ class CookedTablut(CookedTree):
         if king in winning:
             return GAME_STATUS.WHITE_WIN
 
-        surrounding = []
-        n_surrounding = 0
-        for x in range(king.row - 1, king.row + 2):
-            for y in range(king.col - 1, king.col + 2):
-                if x < 0 or x > 8 or y < 0 or y > 8:
-                    continue
-                if chess_board[x][y] == CHESS.BLACK:
-                    surrounding.append(Node(x, y))
-                    n_surrounding += 1
-                    if n_surrounding == 3:
-                        return GAME_STATUS.BLACK_WIN
-        if n_surrounding == 2 and (
-            surrounding[0].row == surrounding[1].row
-            or surrounding[0].col == surrounding[1].col
-        ):
-            return GAME_STATUS.BLACK_WIN
         check = False
 
         my_chess = super()._get_alive_chess(chess_board, role)
@@ -194,19 +195,18 @@ class CookedTablut(CookedTree):
         ):
             return False
 
-        if from_node.row == to_node.row:
-            for y in range(
-                min(from_node.col, to_node.col) + 1, max(from_node.col, to_node.col) + 1
-            ):
-                if chess_board[from_node.row][y] != CHESS.EMPTY:
-                    return False
-
-        if from_node.col == to_node.col:
-            for x in range(
-                min(from_node.row, to_node.row) + 1, max(from_node.row, to_node.row) + 1
-            ):
-                if chess_board[x][from_node.col] != CHESS.EMPTY:
-                    return False
+        # Every cell up to and including the target must be free. A piece that
+        # does not start inside a camp cannot cross a camp cell either.
+        step_row = (to_node.row > from_node.row) - (to_node.row < from_node.row)
+        step_col = (to_node.col > from_node.col) - (to_node.col < from_node.col)
+        from_camp = (from_node.row, from_node.col) in CAMP_CELLS
+        row, col = from_node.row, from_node.col
+        while (row, col) != (to_node.row, to_node.col):
+            row, col = row + step_row, col + step_col
+            if chess_board[row][col] != CHESS.EMPTY:
+                return False
+            if not from_camp and (row, col) in CAMP_CELLS:
+                return False
 
         camps_left = [Node(0, 3), Node(0, 4), Node(0, 5), Node(1, 4)]
         camps_right = [Node(8, 3), Node(8, 4), Node(8, 5), Node(7, 4)]
@@ -223,3 +223,53 @@ class CookedTablut(CookedTree):
             return False
 
         return True
+
+    def _get_captures(self, chess_board: Board, to_node: Node) -> list[Node]:
+        """Captures made by the piece that has just moved to ``to_node``.
+
+        Mirrors the referee (GameAshtonTablut): a capture is always "active",
+        so only the four neighbours of the moved piece can be captured.
+        """
+        mover = chess_board[to_node.row][to_node.col]
+        captured: list[Node] = []
+
+        for d_row, d_col in DIRECTIONS:
+            row, col = to_node.row + d_row, to_node.col + d_col
+            far = (row + d_row, col + d_col)
+            if far[0] < 0 or far[0] > 8 or far[1] < 0 or far[1] > 8:
+                continue
+            victim = chess_board[row][col]
+            anvil = chess_board[far[0]][far[1]]
+
+            if mover == CHESS.BLACK:
+                if victim == CHESS.KING:
+                    if self._is_king_captured(chess_board, row, col, far):
+                        captured.append(Node(row, col))
+                elif victim == CHESS.WHITE and (
+                    anvil == CHESS.BLACK or far in CAMP_CELLS or far == CASTLE
+                ):
+                    captured.append(Node(row, col))
+            elif (
+                mover in (CHESS.WHITE, CHESS.KING)
+                and victim == CHESS.BLACK
+                and (
+                    anvil in (CHESS.WHITE, CHESS.KING, CHESS.THRONE)
+                    or (far in CAMP_CELLS and far not in CAMP_EDGE_CENTERS)
+                )
+            ):
+                captured.append(Node(row, col))
+
+        return captured
+
+    def _is_king_captured(
+        self, chess_board: Board, row: int, col: int, far: tuple[int, int]
+    ) -> bool:
+        """King at (row, col), attacked by a black piece opposite to ``far``."""
+        # In the castle or next to it: every side but the castle must be black.
+        if abs(row - CASTLE[0]) + abs(col - CASTLE[1]) <= 1:
+            return all(
+                (row + d_row, col + d_col) == CASTLE
+                or chess_board[row + d_row][col + d_col] == CHESS.BLACK
+                for d_row, d_col in DIRECTIONS
+            )
+        return chess_board[far[0]][far[1]] == CHESS.BLACK or far in CAMP_CELLS

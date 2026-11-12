@@ -48,10 +48,19 @@ class CookedTree:
         # TODO: Implement this in the subclass
         return True
 
+    def _get_captures(self, chess_board: Board, to_node: Node) -> list[Node]:
+        """Cells captured by the piece that has just moved to ``to_node``."""
+        # TODO: Implement this in the subclass
+        return []
+
     def __make_move(
         self, chess_board: Board, from_node: Node, to_node: Node
-    ) -> tuple[CHESS, CHESS]:
-        """Apply a move in place; return (moving piece, previous target cell)."""
+    ) -> tuple[CHESS, CHESS, list[tuple[Node, CHESS]]]:
+        """Apply a move and its captures in place.
+
+        Return (moving piece, previous target cell, captured cells with their
+        previous content) so that ``__undo_move`` can restore the board.
+        """
         moving_piece: CHESS = chess_board[from_node.row][from_node.col]
         old_target: CHESS = chess_board[to_node.row][to_node.col]
 
@@ -60,7 +69,16 @@ class CookedTree:
             CHESS.THRONE if from_node == self.throne else CHESS.EMPTY
         )
         chess_board[to_node.row][to_node.col] = moving_piece
-        return moving_piece, old_target
+
+        captured: list[tuple[Node, CHESS]] = [
+            (node, chess_board[node.row][node.col])
+            for node in self._get_captures(chess_board, to_node)
+        ]
+        for node, _ in captured:
+            chess_board[node.row][node.col] = (
+                CHESS.THRONE if node == self.throne else CHESS.EMPTY
+            )
+        return moving_piece, old_target, captured
 
     def __undo_move(
         self,
@@ -69,7 +87,10 @@ class CookedTree:
         to_node: Node,
         moving_piece: CHESS,
         old_target: CHESS,
+        captured: list[tuple[Node, CHESS]],
     ) -> None:
+        for node, piece in captured:
+            chess_board[node.row][node.col] = piece
         chess_board[to_node.row][to_node.col] = old_target
         chess_board[from_node.row][from_node.col] = moving_piece
 
@@ -98,7 +119,7 @@ class CookedTree:
                     best_from = node
                     best_to = next_node
 
-                moving_piece, old_target = self.__make_move(
+                moving_piece, old_target, captured = self.__make_move(
                     chess_board, node, next_node
                 )
 
@@ -108,7 +129,9 @@ class CookedTree:
                     chess_board, max_depth, next_role, 1, alpha, beta
                 )
 
-                self.__undo_move(chess_board, node, next_node, moving_piece, old_target)
+                self.__undo_move(
+                    chess_board, node, next_node, moving_piece, old_target, captured
+                )
 
                 if role == ROLE.WHITE:
                     if score > best_score:
@@ -161,7 +184,7 @@ class CookedTree:
                 if not self._is_valid_movement(chess_board, from_node, next_node):
                     continue
 
-                moving_piece, old_target = self.__make_move(
+                moving_piece, old_target, captured = self.__make_move(
                     chess_board, from_node, next_node
                 )
 
@@ -172,7 +195,12 @@ class CookedTree:
                 )
 
                 self.__undo_move(
-                    chess_board, from_node, next_node, moving_piece, old_target
+                    chess_board,
+                    from_node,
+                    next_node,
+                    moving_piece,
+                    old_target,
+                    captured,
                 )
 
                 if role == ROLE.WHITE:
