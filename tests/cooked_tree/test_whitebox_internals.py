@@ -7,8 +7,10 @@ rename in the source only needs one fix in the helper.
 
 import pytest
 from tree_helpers import (
+    INF,
     SIZE,
     THRONE_POS,
+    FakeRulesTree,
     always,
     as_pos,
     constant_heuristic,
@@ -16,6 +18,7 @@ from tree_helpers import (
     legal_moves,
     make_board,
     make_tree,
+    ongoing,
     private,
     random_board,
     reference_alpha_beta,
@@ -61,7 +64,7 @@ def test_wb02_white_includes_king_and_is_row_major():
         }
     )
 
-    alive = private(CookedTree(), "get_alive_chess")(board, ROLE.WHITE)
+    alive = CookedTree()._get_alive_chess(board, ROLE.WHITE)
 
     assert [as_pos(n) for n in alive] == [(2, 6), (4, 4), (7, 1)]
 
@@ -69,14 +72,14 @@ def test_wb02_white_includes_king_and_is_row_major():
 def test_wb02_black_only_black_pieces():
     board = make_board({(7, 1): CHESS.WHITE, (4, 4): CHESS.KING, (0, 0): CHESS.BLACK})
 
-    alive = private(CookedTree(), "get_alive_chess")(board, ROLE.BLACK)
+    alive = CookedTree()._get_alive_chess(board, ROLE.BLACK)
 
     assert [as_pos(n) for n in alive] == [(0, 0)]
 
 
 @pytest.mark.parametrize("role", [ROLE.WHITE, ROLE.BLACK])
 def test_wb02_no_pieces_means_empty_list(role):
-    alive = private(CookedTree(), "get_alive_chess")(make_board({}), role)
+    alive = CookedTree()._get_alive_chess(make_board({}), role)
 
     assert alive == []  # the empty THRONE cell is not a piece
 
@@ -88,9 +91,9 @@ def test_wb03_make_move_moves_the_piece():
     board = make_board({(2, 2): CHESS.WHITE})
     tree = CookedTree()
 
-    piece, old = private(tree, "make_move")(board, Node(2, 2), Node(2, 7))
+    piece, old, captured = private(tree, "make_move")(board, Node(2, 2), Node(2, 7))
 
-    assert (piece, old) == (CHESS.WHITE, CHESS.EMPTY)
+    assert (piece, old, captured) == (CHESS.WHITE, CHESS.EMPTY, [])
     assert board[2][2] == CHESS.EMPTY
     assert board[2][7] == CHESS.WHITE
 
@@ -118,15 +121,38 @@ def test_wb04_leaving_a_normal_cell_leaves_it_empty():
 )
 def test_wb05_undo_restores_whatever_was_on_the_target(target_piece):
     """The target is restored to its ORIGINAL content, not forced to EMPTY
-    (it matters for the throne and for the future capture logic)."""
+    (it matters for the throne)."""
     board = make_board({(0, 0): CHESS.KING})
     board[0][5] = target_piece
     original = copy_board(board)
     tree = CookedTree()
 
-    piece, old = private(tree, "make_move")(board, Node(0, 0), Node(0, 5))
-    private(tree, "undo_move")(board, Node(0, 0), Node(0, 5), piece, old)
+    piece, old, captured = private(tree, "make_move")(board, Node(0, 0), Node(0, 5))
+    private(tree, "undo_move")(board, Node(0, 0), Node(0, 5), piece, old, captured)
 
+    assert board == original
+
+
+def test_wb05_captured_pieces_are_removed_and_restored_by_undo():
+    """A captured king on the throne leaves a THRONE cell, like a vacated one."""
+
+    class CapturingTree(CookedTree):
+        def _get_captures(self, chess_board, to_node):
+            return [Node(2, 3), Node(*THRONE_POS)]
+
+    board = make_board(
+        {(2, 0): CHESS.BLACK, (2, 3): CHESS.WHITE, THRONE_POS: CHESS.KING}
+    )
+    original = copy_board(board)
+    tree = CapturingTree()
+
+    piece, old, captured = private(tree, "make_move")(board, Node(2, 0), Node(2, 2))
+
+    assert captured == [(Node(2, 3), CHESS.WHITE), (Node(*THRONE_POS), CHESS.KING)]
+    assert board[2][3] == CHESS.EMPTY
+    assert board[THRONE_POS[0]][THRONE_POS[1]] == CHESS.THRONE
+
+    private(tree, "undo_move")(board, Node(2, 0), Node(2, 2), piece, old, captured)
     assert board == original
 
 
@@ -135,11 +161,15 @@ def test_wb06_king_returning_to_the_throne_round_trip():
     original = copy_board(board)
     tree = CookedTree()
 
-    piece, old = private(tree, "make_move")(board, Node(4, 6), Node(*THRONE_POS))
+    piece, old, captured = private(tree, "make_move")(
+        board, Node(4, 6), Node(*THRONE_POS)
+    )
     assert board[4][4] == CHESS.KING and board[4][6] == CHESS.EMPTY
     assert old == CHESS.THRONE
 
-    private(tree, "undo_move")(board, Node(4, 6), Node(*THRONE_POS), piece, old)
+    private(tree, "undo_move")(
+        board, Node(4, 6), Node(*THRONE_POS), piece, old, captured
+    )
     assert board == original
 
 
@@ -151,22 +181,20 @@ def test_wb07_default_rules_are_the_placeholder_implementations():
     tree = CookedTree()
     board = make_board({})
 
-    assert tree._game_status(board, ROLE.WHITE) == GAME_STATUS.ONGOING
+    assert tree._get_game_status(board, ROLE.WHITE) == GAME_STATUS.ONGOING
     assert tree._is_valid_movement(board, Node(0, 0), Node(0, 1)) is True
-    assert all(-100 <= tree._heuristic(board, ROLE.WHITE) <= 100 for _ in range(50))
+    assert tree._get_captures(board, Node(0, 1)) == []
+    assert all(-100 <= tree._get_heuristic(board, ROLE.WHITE) <= 100 for _ in range(50))
 
 
 def test_wb08_injected_rules_replace_the_defaults():
-    heuristic = constant_heuristic(1)
-    status = always(GAME_STATUS.DRAW)
+    board = make_board({(3, 3): CHESS.WHITE})
+    tree = make_tree(constant_heuristic(1), always(GAME_STATUS.DRAW))
 
-    tree = CookedTree(
-        heuristic=heuristic, game_status=status, is_valid_movement=rook_is_valid
-    )
-
-    assert tree._heuristic is heuristic
-    assert tree._game_status is status
-    assert tree._is_valid_movement is rook_is_valid
+    assert tree._get_heuristic(board, ROLE.WHITE) == 1
+    assert tree._get_game_status(board, ROLE.WHITE) == GAME_STATUS.DRAW
+    assert tree._is_valid_movement(board, Node(3, 3), Node(3, 4)) is True
+    assert tree._is_valid_movement(board, Node(3, 3), Node(4, 4)) is False
 
 
 # ------------------------------------- WB-09/10 evaluation order & roles
@@ -351,7 +379,7 @@ def test_wb14_oracle_move_generator_agrees_with_the_fake_rule(seed, role):
     produce exactly the moves the rook rule accepts for the tree's vectors."""
     board = random_board(seed, 2, 3)
     tree = CookedTree()
-    alive = private(tree, "get_alive_chess")(board, role)
+    alive = tree._get_alive_chess(board, role)
 
     by_rule = {
         (as_pos(piece), (piece.row + d_row, piece.col + d_col))
@@ -363,12 +391,115 @@ def test_wb14_oracle_move_generator_agrees_with_the_fake_rule(seed, role):
     assert set(legal_moves(board, role)) == by_rule
 
 
-def test_wb13_default_heuristic_uses_get_score():
-    """Test that __get_heuristic is called when no custom heuristic is injected."""
+def test_wb13_default_heuristic_returns_an_int():
+    """The base class heuristic is a placeholder that still returns an int."""
     tree = CookedTree()
     board = make_board({(3, 3): CHESS.WHITE, (5, 5): CHESS.BLACK})
 
-    # This should use the default __get_heuristic which calls get_score
-    result = tree._heuristic(board, ROLE.WHITE)
+    result = tree._get_heuristic(board, ROLE.WHITE)
 
     assert isinstance(result, int)
+
+
+# ------------------------------- WB-16..20 iterative deepening with a deadline
+
+
+class DeepeningSpy(FakeRulesTree):
+    """Records the depths that are searched and runs on a hand-driven clock."""
+
+    def __init__(self, heuristic, game_status=ongoing):
+        super().__init__(heuristic, game_status)
+        self.now = 0.0
+        self.seconds_per_depth = 0.0
+        self.depths: list[int] = []
+        self._clock = lambda: self.now
+
+    def get_next_movement(self, chess_board, role, max_depth):
+        self.depths.append(max_depth)
+        result = super().get_next_movement(chess_board, role, max_depth)
+        self.now += self.seconds_per_depth
+        return result
+
+
+@pytest.mark.parametrize("role", [ROLE.WHITE, ROLE.BLACK], ids=lambda r: r.name)
+@pytest.mark.parametrize("seed", range(3))
+def test_wb16_with_enough_time_it_equals_the_fixed_depth_search(seed, role):
+    board = random_board(seed, 2, 3)
+    original = copy_board(board)
+    heuristic = seeded_heuristic(seed)
+    tree = DeepeningSpy(heuristic)
+
+    result = tree.get_next_movement_in_time(board, role, 1000, max_depth=3)
+
+    assert result == make_tree(heuristic).get_next_movement(original, role, 3)
+    assert tree.depths == [1, 2, 3]
+    assert tree.completed_depth == 3
+    assert board == original
+
+
+@pytest.mark.parametrize("role", [ROLE.WHITE, ROLE.BLACK], ids=lambda r: r.name)
+def test_wb17_timeout_keeps_the_last_completed_depth_and_restores_the_board(role):
+    """The deadline passes in the middle of depth 3, while moves are applied
+    on the board: the depth-2 answer is returned and the board is put back."""
+    board = random_board(3, 2, 3)
+    original = copy_board(board)
+    heuristic = seeded_heuristic(3)
+    nodes_at_depth_3 = 0
+
+    def status(chess_board, side):
+        nonlocal nodes_at_depth_3
+        if tree.depths[-1] == 3:
+            nodes_at_depth_3 += 1
+            if nodes_at_depth_3 == 20:
+                tree.now = 100.0  # past the deadline (10)
+        return GAME_STATUS.ONGOING
+
+    tree = DeepeningSpy(heuristic, status)
+
+    result = tree.get_next_movement_in_time(board, role, 10)
+
+    reference = make_tree(heuristic)
+    assert tree.depths == [1, 2, 3]
+    assert tree.completed_depth == 2
+    assert result == reference.get_next_movement(copy_board(original), role, 2)
+    assert board == original
+    # The deadline is cleared: a later fixed-depth search is not interrupted.
+    assert tree.get_next_movement(board, role, 3) == reference.get_next_movement(
+        copy_board(original), role, 3
+    )
+
+
+def test_wb18_depth_one_is_always_completed_even_without_time():
+    board = random_board(5, 2, 3)
+    original = copy_board(board)
+    heuristic = seeded_heuristic(5)
+    tree = DeepeningSpy(heuristic)
+
+    result = tree.get_next_movement_in_time(board, ROLE.WHITE, 0)
+
+    assert result == make_tree(heuristic).get_next_movement(original, ROLE.WHITE, 1)
+    assert tree.completed_depth == 1
+    assert board == original
+
+
+def test_wb19_a_decided_position_is_not_searched_deeper():
+    board = make_board({(4, 3): CHESS.KING, (0, 0): CHESS.BLACK})
+    tree = DeepeningSpy(constant_heuristic(0), always(GAME_STATUS.WHITE_WIN))
+
+    result = tree.get_next_movement_in_time(board, ROLE.WHITE, 1000)
+
+    assert result.score == INF
+    assert tree.depths == [1]
+
+
+def test_wb20_the_next_depth_is_skipped_when_it_cannot_fit():
+    """Depth 2 took 4s and 2s are left: depth 3 would be slower, so it is not
+    started (the deadline itself has not passed yet)."""
+    board = random_board(6, 2, 3)
+    tree = DeepeningSpy(seeded_heuristic(6))
+    tree.seconds_per_depth = 4.0
+
+    tree.get_next_movement_in_time(board, ROLE.WHITE, 10)
+
+    assert tree.depths == [1, 2]
+    assert tree.completed_depth == 2

@@ -117,6 +117,35 @@ def ongoing(board: Board, role: ROLE) -> GAME_STATUS:
     return GAME_STATUS.ONGOING
 
 
+class FakeRulesTree(CookedTree):
+    def __init__(
+        self,
+        heuristic: Callable[[Board, ROLE], int],
+        game_status: Callable[[Board, ROLE], GAME_STATUS],
+    ) -> None:
+        super().__init__()
+        self._heuristic_fn = heuristic
+        self._game_status_fn = game_status
+
+    def _get_heuristic(self, chess_board: Board, role: ROLE) -> int:
+        return self._heuristic_fn(chess_board, role)
+
+    def _get_game_status(self, chess_board: Board, role: ROLE) -> GAME_STATUS:
+        return self._game_status_fn(chess_board, role)
+
+    def _is_valid_movement(
+        self, chess_board: Board, from_node: Node, to_node: Node
+    ) -> bool:
+        return rook_is_valid(chess_board, from_node, to_node)
+
+
+def make_tree(
+    heuristic: Callable[[Board, ROLE], int] | None = None,
+    game_status: Callable[[Board, ROLE], GAME_STATUS] = ongoing,
+) -> CookedTree:
+    return FakeRulesTree(heuristic or seeded_heuristic(), game_status)
+
+
 # ---------------------------------------------------------------- oracle
 
 
