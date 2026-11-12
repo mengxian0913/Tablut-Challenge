@@ -19,10 +19,10 @@ import matplotlib.pyplot as plt
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from tablut.common.enums.chess import CHESS
+from tablut.common.enums.player import ROLE
 from tablut.cooked_tablut.cooked_tablut import CookedTablut
-from src.tablut.common.enums.player import ROLE
-from src.tablut.common.enums.chess import CHESS
-from src.tablut.utils.logger import Logger
+from tablut.utils.logger import Logger
 
 
 class DepthBenchmark:
@@ -31,25 +31,23 @@ class DepthBenchmark:
         self.results = {}
 
     def create_initial_board(self) -> list[list[CHESS]]:
-        """Create initial Tablut board state (worst case: all pieces present)."""
+        """Create the standard Ashton Tablut opening (all pieces present)."""
         board = [[CHESS.EMPTY for _ in range(9)] for _ in range(9)]
 
         # White pieces (defenders)
         white_positions = [
-            (0, 4), (1, 4), (2, 4), (3, 4), (5, 4), (6, 4), (7, 4), (8, 4),
-            (4, 0), (4, 1), (4, 2), (4, 3), (4, 5), (4, 6), (4, 7), (4, 8),
+            (2, 4), (3, 4), (5, 4), (6, 4),
+            (4, 2), (4, 3), (4, 5), (4, 6),
         ]
         for r, c in white_positions:
             board[r][c] = CHESS.WHITE
 
-        # Black pieces (attackers)
+        # Black pieces (attackers), one group per camp
         black_positions = [
-            (0, 3), (0, 4), (0, 5),
-            (1, 4),
-            (3, 0), (3, 8),
-            (4, 0), (4, 8),
-            (5, 4),
-            (8, 3), (8, 4), (8, 5),
+            (0, 3), (0, 4), (0, 5), (1, 4),
+            (8, 3), (8, 4), (8, 5), (7, 4),
+            (3, 0), (4, 0), (5, 0), (4, 1),
+            (3, 8), (4, 8), (5, 8), (4, 7),
         ]
         for r, c in black_positions:
             board[r][c] = CHESS.BLACK
@@ -254,9 +252,9 @@ DEPTH_BENCHMARK = {dict_str}
                 self.logger.info(f"Average: {avg_time:.3f}s")
 
                 # Safety check: if taking too long, stop
-                if avg_time > 30:
+                if avg_time > 60:
                     self.logger.warning(
-                        f"Depth {depth} exceeded 30s, stopping benchmarks"
+                        f"Depth {depth} exceeded 60s, stopping benchmarks"
                     )
                     break
 
