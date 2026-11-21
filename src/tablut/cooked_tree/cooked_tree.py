@@ -24,6 +24,7 @@ class CookedTree:
         self.throne: Node = Node(4, 4)
         self.move_row: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, -1, -2, -3, -4, -5, -6, -7, -8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # fmt: skip # noqa: E501
         self.move_col: list[int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, -1, -2, -3, -4, -5, -6, -7, -8]  # fmt: skip # noqa: E501
+        self.graph: dict = {}
 
         # Depth fully searched by the last get_next_movement_in_time call.
         self.completed_depth: int = 0
@@ -241,6 +242,9 @@ class CookedTree:
                 next_node: Node = Node(from_node.row + mv_row, from_node.col + mv_col)
                 if not self._is_valid_movement(chess_board, from_node, next_node):
                     continue
+                if next_node not in self.graph:
+                    self.graph[next_node] = [from_node]
+                    self.graph[next_node].append(cur_depth)
 
                 moving_piece, old_target, captured = self.__make_move(
                     chess_board, from_node, next_node
@@ -254,8 +258,14 @@ class CookedTree:
                     chess_board, max_depth, next_role, cur_depth + 1, alpha, beta
                 )
 
-                label = "leaf" if cur_depth == max_depth - 1 else None
-                self._record(parent_key, child_key, cur_depth, score, label)
+                self.graph[next_node].append(score)
+
+                if cur_depth == 0:
+                    self.graph[next_node].append("root")
+                elif cur_depth == max_depth - 1:
+                    self.graph[next_node].append("leaf")
+                else:
+                    self.graph[next_node].append(None)
 
                 self.__undo_move(
                     chess_board,
