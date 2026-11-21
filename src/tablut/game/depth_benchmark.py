@@ -11,8 +11,9 @@ This will update the table below with actual performance metrics from your machi
 
 # Placeholder values - run benchmark script to populate actual data
 DEPTH_BENCHMARK = {
-    1: 0.035926,
-    2: 0.119547,
-    3: 7.224410,
-    4: 48.031390,
+    1: 0.010893,
+    2: 0.050912,
+    3: 2.057572,
+    4: 19.019903,
+    5: 551.072242,
 }
