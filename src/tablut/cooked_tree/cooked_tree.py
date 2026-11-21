@@ -30,6 +30,10 @@ class CookedTree:
         self._clock: Callable[[], float] = time.perf_counter
         self.__deadline: float | None = None
 
+        # For graph storing.
+        self.graph: dict = {}
+        self.counter: int = 0
+
     def _get_alive_chess(
         self, chess_board: list[list[CHESS]], role: ROLE
     ) -> list[Node]:
@@ -228,6 +232,8 @@ class CookedTree:
 
         alive_chess: list[Node] = self._get_alive_chess(chess_board, role)
 
+        parent_key = self._snapshot(chess_board)
+
         best: int = -self.INF if role == ROLE.WHITE else self.INF
 
         for from_node in alive_chess:
@@ -240,11 +246,16 @@ class CookedTree:
                     chess_board, from_node, next_node
                 )
 
+                child_key = self._snapshot(chess_board)
+
                 next_role = ROLE.BLACK if role == ROLE.WHITE else ROLE.WHITE
 
                 score: int = self.__min_max_tree(
                     chess_board, max_depth, next_role, cur_depth + 1, alpha, beta
                 )
+
+                label = "leaf" if cur_depth == max_depth - 1 else None
+                self._record(parent_key, child_key, cur_depth, score, label)
 
                 self.__undo_move(
                     chess_board,
@@ -267,3 +278,12 @@ class CookedTree:
                         return best
 
         return best
+
+    def _snapshot(self, chess_board: Board) -> tuple:
+        return tuple(tuple(row) for row in chess_board)
+
+    def _record(
+        self, parent: tuple, child: tuple, depth: int, score: int, label
+    ) -> None:
+        self.counter += 1
+        self.graph[child] = [parent, depth, score, label]

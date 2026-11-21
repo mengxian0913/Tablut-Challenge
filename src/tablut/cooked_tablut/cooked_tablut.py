@@ -245,3 +245,42 @@ class CookedTablut(CookedTree):
                 for d_row, d_col in DIRECTIONS
             )
         return chess_board[far[0]][far[1]] == CHESS.BLACK or far in CAMP_CELLS
+
+    def track(self, chess_board: Board, saved: list) -> bool:
+        parent = self.graph[chess_board][0]
+
+        if parent in saved:
+            saved.append(chess_board)
+            return True
+
+        if parent not in self.graph:
+            del self.graph[chess_board]
+            return False
+
+        if self.track(parent, saved):
+            saved.append(chess_board)
+            return True
+
+        del self.graph[chess_board]
+        return False
+
+    def backtrack(self):
+        best = None
+        max_score = -self.INF
+        for move in self.graph:
+            if self.graph[move][1] == 0:
+                score = self.graph[move][2]
+                if score > max_score:
+                    max_score = score
+                    best = move
+        self.graph[best][3] = "chosen"
+
+        saved = [self.graph[best]]
+        for move in self.graph:
+            if self.graph[move][3] == "leaf":
+                try:
+                    check = self.track(move, saved)
+                except IndexError:
+                    del self.graph[move]
+                if not check:
+                    del self.graph[move]
