@@ -1,0 +1,31 @@
+Tablut Challenge - Delivery file
+Team: Cooked
+
+Student01: Meng-Xian, Yang | mengxian.yang@studio.unibo.it
+Student02: Luca Vaccarezz  | luca.vaccarezza@studio.unibo.it
+
+1. Virtual machine
+   Link (OneDrive): <ONEDRIVE_LINK>
+   Login: username "tablut", password "tablut" (credentials and SSH settings not modified)
+   Project folder inside the VM: /home/tablut/tablut
+   Launcher script: /home/tablut/tablut/runmyplayer.sh
+
+2. How to run the player from the command line
+   /home/tablut/tablut/runmyplayer.sh <ROLE> <TIMEOUT> <SERVER_IP>
+
+   - ROLE: WHITE or BLACK (case-insensitive). WHITE connects to port 5800, BLACK to port 5801.
+   - TIMEOUT: seconds allowed per move (positive integer, may be lower than 60).
+   - SERVER_IP: IP address of the referee server (not hardcoded to localhost).
+
+   Example:
+   /home/tablut/tablut/runmyplayer.sh WHITE 60 192.168.20.101
+
+   The script runs the player with "uv run" from the project folder. The VM has no
+   internet access during the tournament, so all dependencies (see uv.lock) must be
+   installed in the VM beforehand.
+
+3. Optional parameters
+   None. The player takes only the three required parameters above.
+
+4. Repository
+   https://github.com/mengxian0913/Tablut-Challenge
