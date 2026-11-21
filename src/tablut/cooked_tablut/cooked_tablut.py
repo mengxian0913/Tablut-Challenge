@@ -246,45 +246,41 @@ class CookedTablut(CookedTree):
             )
         return chess_board[far[0]][far[1]] == CHESS.BLACK or far in CAMP_CELLS
 
-    def track(self, Node: Node, saved: list) -> bool:
-        parent = self.graph[Node][0]
+    def track(self, chess_board: Board, saved: list) -> bool:
+        parent = self.graph[chess_board][0]
+
         if parent in saved:
-            saved.append(Node)
+            saved.append(chess_board)
             return True
-        if self.graph[Node][2] == "root":
-            del self.graph[Node]
+
+        if parent not in self.graph:
+            del self.graph[chess_board]
             return False
 
-        check = True
-        try:
-            check = self.track(parent, saved)
-        except IndexError:
-            del self.graph[Node]
-            return False
-        if not check:
-            del self.graph[Node]
-            return False
-        else:
-            saved.append(Node)
+        if self.track(parent, saved):
+            saved.append(chess_board)
             return True
+
+        del self.graph[chess_board]
+        return False
 
     def backtrack(self):
         best = None
         max_score = -self.INF
-        for node in self.graph:
-            if self.graph[node][1] == 1:
-                score = self.graph[node][2]
+        for move in self.graph:
+            if self.graph[move][1] == 0:
+                score = self.graph[move][2]
                 if score > max_score:
                     max_score = score
-                    best = node
+                    best = move
         self.graph[best][3] = "chosen"
 
         saved = [self.graph[best]]
-        for node in self.graph:
-            if self.graph[node][3] == "leaf":
+        for move in self.graph:
+            if self.graph[move][3] == "leaf":
                 try:
-                    check = self.track(node, saved)
+                    check = self.track(move, saved)
                 except IndexError:
-                    del self.graph[node]
+                    del self.graph[move]
                 if not check:
-                    del self.graph[node]
+                    del self.graph[move]
