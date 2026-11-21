@@ -2,10 +2,10 @@ Tablut Challenge - Delivery file
 Team: Cooked
 
 Student01: Meng-Xian, Yang | mengxian.yang@studio.unibo.it
-Student02: Luca Vaccarezz  | luca.vaccarezza@studio.unibo.it
+Student02: Luca Vaccarezza  | luca.vaccarezza@studio.unibo.it
 
 1. Virtual machine
-   Link (OneDrive): <ONEDRIVE_LINK>
+   Link (OneDrive): https://liveunibo-my.sharepoint.com/:f:/g/personal/luca_vaccarezza_studio_unibo_it/IgAUDdCihVFAR6NYkNuTb550AQIUJIcO8tgXsqgUBriSrFo?e=lrsvl9
    Login: username "tablut", password "tablut" (credentials and SSH settings not modified)
    Project folder inside the VM: /home/tablut/tablut
    Launcher script: /home/tablut/tablut/runmyplayer.sh
